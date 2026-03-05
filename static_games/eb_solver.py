@@ -1,60 +1,68 @@
 from .ProspectTheory import ProspectTheory
-import numpy as np
+import functools
+import jax
+import jax.numpy as np
 import itertools
+import matplotlib.pyplot as plt
 
 def compute_eb_equilibrium(U, pt, p1_type, p2_type):
     """Compute the cpt equilibrium using the semi smooth newton method.
        First, check for pure equilibria, then check for mixed strategies with newton""" 
     # Define equilibria variables
-    pure_equil, mixed_equil = [], dict()
+    equil = dict()
 
-    # Define Util Funtion:
-    def util_func(values, probs, player_type):
-        if player_type == "EU":
-            return probs @ values
+    row_a_1, row_a_2 = np.array([U[0, 0, 0], U[0, 1, 0]]), np.array([U[1, 0, 0], U[1, 1, 0]])
+    col_a_1, col_a_2 = np.array([U[0, 0, 1], U[1, 0, 1]]), np.array([U[0, 1, 1], U[1, 1, 1]])
 
-        elif player_type == "PT":
-            return pt.expected_pt_value(values, probs)
+    x_r_a_1 = np.argsort(row_a_1)
 
-    # First, check for pure. For CPT EB, it becomes degenerate because the opp beliefs are 0, 1. 
-    # We calculate the prospect using the certainty given to us by the loops 
+    x_r_a_2 = np.argsort(row_a_2)
 
-    for i in range(U.shape[0]):
-        for j in range(U.shape[1]):
-            p = 1.0 if i == 0 else 0.0 # Prob P1 plays action 0
-            q = 1.0 if j == 0 else 0.0 # Prob P2 plays action 0
+    x_c_a_1 = np.argsort(col_a_1)
 
-            probs1, probs2 = np.array([q, 1-q]), np.array([p, 1-p]) 
+    x_c_a_2 = np.argsort(col_a_2)
 
-            # We check what the values of staying are across opponent actions, 
-            # And then we get the value if we deviate for each action
-            # So, to explain indexing, stay keeps i fixed (where we are in the loop for p1) and hardcodes both p2 actions wrt the probs
-            # THen deviate hardcodes the current player deviating (1-i) or (1-j), and then we operate over the opp actions
+    sort_orders = (x_r_a_1, x_r_a_2, x_c_a_1, x_c_a_2)
 
-            p1_stay = np.array([U[i, 0, 0], U[i, 1, 0]]) # i stays fixed, opp actions change
-            p1_dev = np.array([U[1-i, 0, 0], U[1-i, 1, 0]]) # i gets inverted, opp actions change
+    is_pt_p1, is_pt_p2 = True, False
 
-            p2_stay = np.array([U[0, j, 1], U[1, j, 1]]) # j stays fixed, row changes
-            p2_dev = np.array([U[0, 1-j, 1], U[1, 1-j, 1]]) # j gets inverted, row changes
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-            # Then we can compute two lotteries with opp probs fixed and stay/dev measured
-            v1_1, v1_2 = util_func(p1_stay, probs1, p1_type), util_func(p1_dev, probs1, p1_type)
-            v2_1, v2_2 = util_func(p2_stay, probs2, p2_type), util_func(p2_dev, probs2, p2_type)
-    
-            # So if both players want to stay, we are at equilibrium
-            if v1_1 >= v1_2 and v2_1 >= v2_2:
-                pure_equil.append((i, j))
+    x_vals = np.linspace(0, 1, 201)
 
-    for idx, (i, j) in enumerate(pure_equil):
-        p = 1.0 if i == 0 else 0.0 # Prob P1 plays action 0
-        q = 1.0 if j == 0 else 0.0 # Prob P2 plays action 0
-        pure_equil[idx] = (p, q) 
+    # F over p with q fixed
+    y_vals_p = np.array([compute_F(np.array([xi, 0.5]), U, is_pt_p1, is_pt_p2, pt, sort_orders) for xi in x_vals])
+    ax1.plot(x_vals, y_vals_p[:, 0], label='Player 1')
+    ax1.plot(x_vals, y_vals_p[:, 1], label='Player 2')
+    ax1.axhline(0, color='k', linestyle='--')
+    ax1.set_xlabel('p')
+    ax1.set_ylabel('F_z')
+    ax1.set_title('F_z over p (q=0.5)')
+    ax1.legend()
 
-    # Now, mixed strategies with newtown semismooth:
+    # F over q with p fixed
+    y_vals_q = np.array([compute_F(np.array([0.5, xi]), U, is_pt_p1, is_pt_p2, pt, sort_orders) for xi in x_vals])
+    ax2.plot(x_vals, y_vals_q[:, 0], label='Player 1')
+    ax2.plot(x_vals, y_vals_q[:, 1], label='Player 2')
+    ax2.axhline(0, color='k', linestyle='--')
+    ax2.set_xlabel('q')
+    ax2.set_ylabel('F_z')
+    ax2.set_title('F_z over q (p=0.5)')
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
     # Start with many seeds to explore the space (why not?)
     # The point is to make sure we aren't convrging to specific basins based on initialization
-    starting_points = [0.1, 0.3, 0.5, 0.7, 0.9]
+    starting_points = [0.0, 0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99, 1.0]
     init_list = itertools.product(starting_points, starting_points) 
+
+    seed = 42
+
+    key = jax.random.PRNGKey(seed)
+ 
 
     # Iterate through seed pairs, append to mixed equil
     for p, q in init_list:
@@ -62,30 +70,34 @@ def compute_eb_equilibrium(U, pt, p1_type, p2_type):
         max_tries = 1000
         counter = 0
         z = np.array([p, q])
+        print(f'\r\033[K P: {p}, Q: {q}', end="")
         while counter < max_tries:
+   
             counter += 1
+            key, subkey = jax.random.split(key)
 
             try:
-                z, is_root = semismooth_newton(U, z, util_func, p1_type, p2_type)
+                z, is_root = semismooth_newton(U, z, counter, subkey, p1_type, p2_type, pt, sort_orders)
+                is_root = bool(is_root)
 
             except ValueError as e:
                 print(f'Semismooth failed, error: {e}')
                 break
 
             if is_root:
-                z_round = np.round(z, 5)
-                key = f'equil = {tuple(z_round)}'
-                if key not in mixed_equil.keys():
-                    mixed_equil[key] = [f'p={p}, q={q}']
+                z_round = np.round(z, 3)
+                dict_key = f'equil = {tuple(z_round)}'
+                if dict_key not in equil.keys():
+                    equil[dict_key] = [f'p={p}, q={q}']
                 else:
-                    mixed_equil[key].append(f'p={p}, q={q}')
+                    equil[dict_key].append(f'p={p}, q={q}')
                 break
 
-    return pure_equil, mixed_equil
+    print()
+    return equil
 
 
-
-def semismooth_newton(U, z, util_func, p1_type, p2_type, eps=1e-6):
+def semismooth_newton(U, z, step_num, key, p1_type, p2_type, pt, sort_orders, eps=1e-3):
     '''
     A semismooth newton solver for cpt equilibrium of beliefs. We are looking for zeros in the F(z) function
     Here F(z) is the indifference (optimality?) condition val(action 1) = val (action 2), and we are looking for 
@@ -99,39 +111,83 @@ def semismooth_newton(U, z, util_func, p1_type, p2_type, eps=1e-6):
     4) solve linear equation x = J^-1 (-F(z)) to find where the function hits 0
     5) update z with x, repeat if needed (outer loop)
     '''
-    # Step 1) Define starting conditions for each strategy (e.g. (0.5, 0.5))
-    p, q = z
-    # Step 2) Map the probabilities z = p, q into F space
+    # Step 1) Map the probabilities z = p, q into F space
     # F is the difference vector between actions for each player
     # That is, CPT( Value_A | prob) - CPT (Value_B | prob)
+    is_pt_p1 = True if p1_type == "PT" else False
+    is_pt_p2 = True if p2_type == "PT" else False
 
+    return newton_step(z, U, step_num, key, is_pt_p1, is_pt_p2, pt, sort_orders) 
+
+@functools.partial(jax.jit, static_argnums=(4,5,6))
+def newton_step(z, U, step_num, key, is_pt_p1, is_pt_p2, pt, sort_orders, eps=1e-3):
+    z = np.clip(z, 0, 1)
+    F_z = compute_F(z, U, is_pt_p1, is_pt_p2, pt, sort_orders)
+
+    # Step 2) Compute the Jacobian J for the mapping p,q -> F
+    jacobian = jax.jacobian(compute_F)(z, U, is_pt_p1, is_pt_p2, pt, sort_orders)
+
+    # Step 3) Solve for delta s.t. Jdelta = -F(z)
+
+    # We were having a problem with the EU case where F_Z | EU is a constant value
+    # with no root, so solutions were diverging. 
+
+    # The logic here checks if the jacobian is near singular, which may make the 
+    # Jacobian unsafe to invert: It can blow up the computation to massive swings
+    # Then if under a threshold (1e-3) we just do an adhoc heuristic moving
+    # z in the same direction as the sign of F_z
+
+    # The point is that, in dominance solvable games, the player ALWAYS 
+    # Prefers that action, and there is no interior root. 
+    # So we use the heuristic to skip the newton step and push towards
+    # the same direction as F_z's sign, a safer update, especially for cases 
+    # where there is no interior root and we are searchign for pure equilibria. 
+
+    det = np.linalg.det(jacobian)
+    newton_delta = np.linalg.solve(jacobian + 1e-4 * np.eye(2), -F_z)
+    fallback_delta = 0.1 * np.sign(F_z)
+    delta = np.where((np.abs(det) < 1e-3) & (np.linalg.norm(F_z) >= eps), fallback_delta, newton_delta)
+
+    noise_scale = 0.1 / np.sqrt(step_num + 1.0)
+    noise = jax.random.normal(key, shape=z.shape) * noise_scale
+
+    z = np.clip(z + delta + noise, 0, 1)
+    F_new = compute_F(z, U, is_pt_p1, is_pt_p2, pt, sort_orders)
+
+    p_ok = (np.abs(F_new[0]) < eps) | ((z[0] <= eps) & (F_new[0] < 0)) | ((z[0] >= 1 - eps) & (F_new[0] > 0))
+    q_ok = (np.abs(F_new[1]) < eps) | ((z[1] <= eps) & (F_new[1] < 0)) | ((z[1] >= 1 - eps) & (F_new[1] > 0))
+    converged = p_ok & q_ok
+    #jax.debug.print("z: {}, F: {}, p_ok: {}, q_ok: {}", z, F_new, p_ok, q_ok)
+
+    return z, converged
+
+
+@functools.partial(jax.jit, static_argnums=(2,3,4))
+def compute_F(z, U, is_pt_p1, is_pt_p2, pt, sort_orders):
+    U = np.array(U)
+    p, q = z
     # Calculate F_i for each player via the indifference equation u(A_1) - u(A_2)
     # Player 1 is rows, player 2 is columns
     row_a_1, row_a_2 = np.array([U[0, 0, 0], U[0, 1, 0]]), np.array([U[1, 0, 0], U[1, 1, 0]])
     col_a_1, col_a_2 = np.array([U[0, 0, 1], U[1, 0, 1]]), np.array([U[0, 1, 1], U[1, 1, 1]])
-    
+
     # Define the prob vectors for both: p1 is the probs player 2 players action 0 or 1, and vice versa
     p_1_probs, p_2_probs = np.array([q, 1-q]), np.array([p, 1-p])
-     
-    player_1_F = util_func(row_a_1, p_1_probs, p1_type) - util_func(row_a_2, p_1_probs, p1_type)
-    player_2_F = util_func(col_a_1, p_2_probs, p2_type) - util_func(col_a_2, p_2_probs, p2_type) 
+
+    if is_pt_p1:
+        player_1_F = pt.expected_pt_value(row_a_1, p_1_probs, sort_orders[0]) - pt.expected_pt_value(row_a_2, p_1_probs, sort_orders[1])
+    else:
+        player_1_F = p_1_probs @ row_a_1 - p_1_probs @ row_a_2 
+
+    if is_pt_p2:
+        player_2_F = pt.expected_pt_value(col_a_1, p_2_probs, sort_orders[2]) - pt.expected_pt_value(col_a_2, p_2_probs, sort_orders[3])
+    else:
+        player_2_F = p_2_probs @ col_a_1 - p_2_probs @ col_a_2
+    
     F_z = np.array([player_1_F, player_2_F])
+    return F_z
 
-    if abs(F_z[0]) < eps and abs(F_z[1]) < eps:
-        return z, True
-
-    # Step 3) Compute the Jacobian J for the mapping p,q -> F
-    jacobian = compute_jacobian(p, q, util_func, U, p1_type, p2_type) 
-
-    # Step 4) Solve for delta s.t. Jdelta = -F(z)
-    delta = np.linalg.solve(jacobian, -F_z)
-   
-    # Step 5) clip and return the updated p, q values
-    z += delta 
-    z = np.clip(z, 0, 1) # clip to avoid returning a value outside of the prob range
-
-    return z, False 
-
+# Deprecated
 def compute_jacobian(p, q, util_func, U, p1_type, p2_type, eps=1e-6):
     ''' 
     A numerical computation of the jacobian matrix for the semismooth newton method

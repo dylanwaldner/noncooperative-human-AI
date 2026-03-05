@@ -1,4 +1,4 @@
-import numpy as np
+import jax.numpy as np
 
 class ProspectTheory:
     """Complete PT implementation for game analysis"""
@@ -13,38 +13,28 @@ class ProspectTheory:
     def value_function(self, x):
         """PT value function v(x)"""
         x = x - self.r
-        if x >= 0:
-            return (x + 1e-10) ** self.alpha
-        else:
-            return -self.lambd * ((-x + 1e-10) ** self.alpha)
-
+        return np.where(
+            x >= 0,
+            (x + 1e-4)**self.alpha,
+            -self.lambd * ((-x + 1e-4)**self.alpha)
+        )
     def w_plus(self, p):
-        if p <= 0.0:
-            return 0.0
-        elif p >= 1.0:
-            return 1.0
-        else:
-            return p ** self.gamma / (p ** self.gamma + (1 - p) ** self.gamma) ** (1 / self.gamma) 
-
+        old_p = p
+        p = np.clip(p, 1e-4, 1 - 1e-4)
+        raw = p**self.gamma / (p**self.gamma + (1 - p)**self.gamma)**(1 / self.gamma)
+        return np.where(old_p <= 0.0, 0.0, np.where(old_p >= 1.0, 1.0, raw))
     def w_minus(self, p):
-        if p <= 0.0:
-            return 0.0
-        elif p >= 1.0:
-            return 1.0
-        else:
-            return p ** self.delta / (p ** self.delta + (1 - p) ** self.delta) ** (1 / self.delta)
+        old_p = p
+        p = np.clip(p, 1e-4, 1 - 1e-4)
+        raw = p**self.delta / (p**self.delta + (1 - p)**self.delta)**(1 / self.delta)
+        return np.where(old_p <= 0.0, 0.0, np.where(old_p >= 1.0, 1.0, raw))
 
-    def cpt_gains(self, outcomes, probabilities):
+    def cpt_gains(self, outcomes, probabilities, order):
         # keep gains only
-        mask = outcomes > self.r
-        x = outcomes[mask]
-        p = probabilities[mask]
-
-        if len(x) == 0:
-            return 0.0
+        x = np.where(outcomes > self.r, outcomes, self.r)
+        p = np.where(outcomes > self.r, probabilities, 0.0)
 
         # sort gains ascending
-        order = np.argsort(x)
         x = x[order]
         p = p[order]
 
@@ -62,51 +52,46 @@ class ProspectTheory:
         tail = np.cumsum(p[::-1])[::-1]
 
         # decision weights
-        w_tail = np.array([self.w_plus(t) for t in tail], dtype=float)
-        v_x = np.array([self.value_function(xi) for xi in x], dtype=float)
+        w_tail = self.w_plus(tail)
+        v_x = self.value_function(x)
         
         # We already have the cdf for each outcome, 
         # now we just need to shift it and add a 0 to preserve dimensions
-        w_tail_next = np.concatenate([w_tail[1:], [0.0]])
+        w_tail_next = np.concatenate([w_tail[1:], np.array([0.0])])
         pi = w_tail - w_tail_next
 
-        return float(np.sum(pi * v_x))
+        return np.array(np.sum(pi * v_x), float)
 
-    def cpt_losses(self, outcomes, probabilities):
+    def cpt_losses(self, outcomes, probabilities, order):
         # Get losses
-        mask = outcomes < self.r
-        x = outcomes[mask]
-        p = probabilities[mask]
-
-        if len(x) == 0:
-            return 0.0
+        x = np.where(outcomes < self.r, outcomes, self.r)
+        p = np.where(outcomes < self.r, probabilities, 0.0)
 
         # Sort losses
-        sorted_indices = np.argsort(x)      
-        x = x[sorted_indices]
-        p = p[sorted_indices]
+        x = x[order]
+        p = p[order]
 
         # cum sum
         head = np.cumsum(p)
 
         # decision weighting
-        w_head = np.array([self.w_minus(h) for h in head], dtype=float)
-        v_x = np.array([self.value_function(xi) for xi in x], dtype=float)
+        w_head = self.w_minus(head)
+        v_x = self.value_function(x)
 
         # previous outcome
         # Here we right shift everything by 1, so 
         # at difference time (indices to follow) we get -m - -m-1, -m +1 - -m, ..., i - i-1
-        w_prev_head = np.concatenate([[0.0], w_head[:-1]])
+        w_prev_head = np.concatenate([np.array([0.0]), w_head[:-1]])
 
         # difference
         pi = w_head - w_prev_head
 
         # Rewritten with .dot for speed
-        return float(pi.dot(v_x))
+        return np.array(pi.dot(v_x), float)
 
-    def expected_pt_value(self, outcomes, probabilities):
+    def expected_pt_value(self, outcomes, probabilities, order):
         outcomes, probabilities = np.array(outcomes), np.array(probabilities,dtype=float)
-        return float(self.cpt_gains(outcomes, probabilities) + self.cpt_losses(outcomes, probabilities))
+        return self.cpt_gains(outcomes, probabilities, order) + self.cpt_losses(outcomes, probabilities, order)
 
 
 

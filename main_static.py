@@ -102,14 +102,14 @@ def main():
 	elif choice == 2:
 		'''CPT-EB Equilibrium Logic'''
 
-		pure_equil, mixed_equil = compute_eb_equilibrium(payoff_matrix, pt, agent1_type, agent2_type)
+		equil = compute_eb_equilibrium(payoff_matrix, pt, agent1_type, agent2_type)
 
-		print(f'Game: {game_name}, Pure Equilibrium: {pure_equil}, Mixed Equilibrium: {mixed_equil}')
+		print(f'Game: {game_name}, Equilibrium: {equil}')
 
-		print(f'Mixed Equil. Summary:\n')
-		print(f'Number of Unique Mixed Equilibria: {len(mixed_equil.keys())}\n')
+		print(f'Equil. Summary:\n')
+		print(f'Number of Unique Equilibria: {len(equil.keys())}\n')
 		print('Number of Init Seeds that Converged to Each Equilibria:')
-		for k, v in mixed_equil.items():
+		for k, v in equil.items():
 			print(f'{k} Num Seeds: {len(v)}\n')
 
 	elif choice == 3:

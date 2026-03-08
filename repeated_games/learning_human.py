@@ -19,14 +19,18 @@ class LearningHumanPTAgent:
     Running belief, reference point scalars are tracked and updated after each step of the environment
     """
 
-    def __init__(self, state_size, action_size, opp_action_size, pt_params, agent_id=0, ref_setting='Fixed', lambda_ref=0.95):
-        self.state_size = state_size
+    def __init__(self, state_size, action_size, opp_action_size, pt_params, agent_id=0, ref_setting='Fixed', lambda_ref=0.95, payoff_matrix = None, B=5):
+        self.state_size = state_size * B - 1
         self.action_size = action_size
         self.opp_action_size = opp_action_size
         self.pt = ProspectTheory(**pt_params)
         print('LH PT PARAMS: ', pt_params)
         self.agent_id = agent_id
         self.ref_point = pt_params['r']
+
+        self.bins = [[0.0, 0.19], [0.20, 0.39], [0.40, 0.59], [0.60, 0.79], [0.80, 1.0]]
+
+        self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
 
         # Initialize beliefs function and q values as dictionaries
         self.beliefs = dict()
@@ -58,7 +62,8 @@ class LearningHumanPTAgent:
         self.softmax_counter = 0
 
         # Q-learning parameters, all from paper. Perhaps gamma could be set to 0.99?
-        self.gamma = 0.95 
+        #self.gamma = 0.95 
+        self.avg_reward = 0.0
         self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
@@ -72,6 +77,27 @@ class LearningHumanPTAgent:
         # Track raw vs PT rewards
         self.raw_rewards = []
         self.pt_rewards = []
+
+    def transform_state(self, state):
+        # Transform the states from the s(H) to s(H)B format
+        # First, normalize for simplicity
+        denom = self.max_payoff - self.min_payoff
+        if denom == 0:
+            norm_ref_point = 0
+        else:
+            norm_ref_point = (self.ref_point - self.min_payoff) / denom
+
+        ref_bin = None
+        for idx, b in enumerate(self.bins):
+            if b[0] <= norm_ref_point <= b[1]:
+                ref_bin = idx
+                break
+
+        if ref_bin is None:
+            raise TypeError("Ref bin never updated")
+
+        pt_state = state * self.B + ref_bin
+        return pt_state
 
     def act(self, state):
         # Epsilon exploration (lines 16-17 in alg 1)
@@ -174,10 +200,7 @@ class LearningHumanPTAgent:
                 weighted_q_vals[action] = weighted_q_val
             max_q_val = weighted_q_vals.max()
             
-            # (1 - gamma) normalizes the future trajectory discounting that 
-            # converges to 1/(1-gamma) when gamma < 1
-            # This way the ref point is still on the same scale as the payoffs
-            self.ref_point = (1 - self.gamma) * max_q_val
+            self.ref_point = max_q_val
 
         elif self.ref_update_mode == 'EMAOR':
             # EMA, but now using the opponents rewards 
@@ -233,7 +256,7 @@ class LearningHumanPTAgent:
         q_value = self.q_values[state][action][opp_action]
 
         # Calculate delta in untransformed reward space
-        delta = reward + self.gamma * optimal_next_q_value - q_value 
+        delta = reward - self.avg_reward + optimal_next_q_value - q_value 
         # Update q values
         self.q_values[state][action][opp_action] += self.alpha * delta
 

@@ -25,6 +25,11 @@ class AwareHumanPTAgent:
         self.ref_update_mode = ref_setting
         print('AH: ', self.ref_update_mode)
 
+        self.bins = [[0.0, 0.19], [0.20, 0.39], [0.40, 0.59], [0.60, 0.79], [0.80, 1.0]]
+
+        self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
+
+
         self.ref_point = pt_params['r']
         self.tau = 0.1 # tie break threshold
         self.temperature = 1.3 # High value to encourage randomness
@@ -49,6 +54,27 @@ class AwareHumanPTAgent:
 
         # track ties
         self.softmax_counter = 0 
+
+    def transform_state(self, state):
+        # Transform the states from the s(H) to s(H)B format
+        # First, normalize for simplicity
+        denom = self.max_payoff - self.min_payoff
+        if denom == 0:
+            norm_ref_point = 0
+        else:
+            norm_ref_point = (self.ref_point - self.min_payoff) / denom
+
+        ref_bin = None
+        for idx, b in enumerate(self.bins):
+            if b[0] <= norm_ref_point <= b[1]:
+                ref_bin = idx
+                break
+
+        if ref_bin is None:
+            raise TypeError("Ref bin never updated")
+
+        pt_state = state * self.B + ref_bin
+        return pt_state
 
     def get_opp_br(self, matrix):
         '''

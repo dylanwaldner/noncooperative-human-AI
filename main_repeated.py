@@ -253,12 +253,12 @@ def interactive_experiment():
             # Create agents
             action_size = 2
             if agent1_type == 'Learning_PT':
-                agent1 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 0, ref_setting=ref_setting, lambda_ref = ref_lambda)
+                agent1 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 0, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
             elif agent1_type == "AI":
                 agent1 = AIAgent(env.state_size, 2, 2, 0)
 
             if agent2_type == 'Learning_PT':
-                agent2 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 1, ref_setting=ref_setting, lambda_ref = ref_lambda)
+                agent2 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 1, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
             elif agent2_type == 'AI':
                 agent2 = AIAgent(env.state_size, 2, 2, 1)
 

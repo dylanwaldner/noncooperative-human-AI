@@ -29,8 +29,8 @@ def get_all_games():
         },
         'StagHunt': {
             'payoffs': np.array([
-                [[4, 4], [0, 3]],    # Stag/Stag, Stag/Hare
-                [[3, 0], [2, 2]]     # Hare/Stag, Hare/Hare
+                [[3, 3], [0, 2]],    # Stag/Stag, Stag/Hare
+                [[2, 0], [1, 1]]     # Hare/Stag, Hare/Hare
             ]),
             'description': 'Stag Hunt Coordination Game',
             'actions': ['Stag', 'Hare']
@@ -53,7 +53,7 @@ def get_all_games():
         },
         'CrawfordGame': {
             'payoffs': np.array([
-                [[1, -1], [0, 0]],    # Top/Left, Top/Right
+                [[2, -2], [0, 0]],    # Top/Left, Top/Right
                 [[0, 0], [-1, 1]]     # Bottom/Left, Bottom/Right
             ]),
             'description': 'Crawford Game - convex preference effects',

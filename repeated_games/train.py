@@ -72,28 +72,47 @@ def train_agents(agent1, agent2, env, episodes=500,
         episode_br2 = []
 
         for _ in range(env.horizon):
-            # Agent 1 chooses action
-            action1 = agent1.act(state)
+            if not isinstance(agent1, AIAgent):
+                pt_state1 = agent1.transform_state(state)
+                action1 = agent1.act(pt_state1)
 
-            # Agent 2 chooses action
-            action2 = agent2.act(state)
+            else:
+                pt_state1 = None
+                # Agent 1 chooses action
+                action1 = agent1.act(state)
+
+            if not isinstance(agent2, AIAgent):
+                pt_state2 = agent2.transform_state(state)
+                action2 = agent2.act(pt_state2)
+
+            else:
+                pt_state2 = None
+                # Agent 1 chooses action
+                action2 = agent2.act(state)
 
             # Execute step
             next_state, reward1, reward2, done, _ = env.step(action1, action2)
 
+            if not isinstance(agent1, AIAgent):
+                agent1.ref_update(payoff=reward1, state=pt_state1, opp_payoff=reward2)
+                pt_next_state1 = agent1.transform_state(next_state)
+            else:
+                pt_next_state1 = None
+
+            if not isinstance(agent2, AIAgent):
+                agent2.ref_update(payoff=reward2, state=pt_state2, opp_payoff=reward1)
+                pt_next_state2 = agent2.transform_state(next_state)
+
+            else:
+                pt_next_state2 = None
+
             if isinstance(agent1, LearningHumanPTAgent):
                 # Updates
-                agent1.belief_update(state, action2)
-                agent1.ref_update(payoff=reward1, state=state, opp_payoff=reward2)
-                agent1.q_value_update(state, next_state, action1, action2, reward1, done)
+                agent1.belief_update(pt_state1, action2)
+                agent1.q_value_update(pt_state1, pt_next_state1, action1, action2, reward1, done)
 
-                # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
-                # This is for the q values -> real payoffs convergence metric
                 q_vals = agent1.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)  
-                q_vals = (1 - agent1.gamma) * q_vals
-
-                # Track values of interest
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -113,7 +132,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
                 q_vals = agent1.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)
-                q_vals = (1 - agent1.gamma) * q_vals
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -125,20 +143,17 @@ def train_agents(agent1, agent2, env, episodes=500,
                 del q_vals
 
             else: # Aware Human
-                agent1.ref_update(payoff=reward1, state=state, opp_payoff=reward2)
                 results['ref_points1'].append(agent1.ref_point)
                 
 
             if isinstance(agent2, LearningHumanPTAgent):
                 # Update LH variables
-                agent2.belief_update(state, action1)
-                agent2.ref_update(payoff=reward2, state=state, opp_payoff=reward1)
-                agent2.q_value_update(state, next_state, action2, action1, reward2, done)
+                agent2.belief_update(pt_state2, action1)
+                agent2.q_value_update(pt_state2, pt_next_state2, action2, action1, reward2, done)
 
                 # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
                 q_vals = agent2.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)
-                q_vals = (1 - agent2.gamma) * q_vals
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -155,7 +170,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 agent2.update(state, action2, next_state, reward2, done)
                 q_vals = agent2.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)
-                q_vals = (1 - agent2.gamma) * q_vals
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -167,7 +181,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 del q_vals
 
             else: # Aware Human
-                agent2.ref_update(payoff=reward2, state=state, opp_payoff=reward1) # its pt function gets updated here
                 results['ref_points2'].append(agent2.ref_point)
                 # Pass agent 1 pt func to agent2
                 if not isinstance(agent1, AIAgent):

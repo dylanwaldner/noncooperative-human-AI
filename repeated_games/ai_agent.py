@@ -28,7 +28,8 @@ class AIAgent:
         self.state_visit_counter = dict()
 
         # Q-learning parameters, set from code i inherited, and all is converging so I see no issue. 
-        self.gamma = 0.95
+        # self.gamma = 0.95
+        self.avg_rew = 0.0
         self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
@@ -91,13 +92,11 @@ class AIAgent:
         # Get the max val for the next state
         max_next_q_val = self.q_values[next_state].max()
 
-        # get rid of future trajectories when reaching end of episode
-        done = False
-        if done is True:
+        if self.state_size == 1:
             max_next_q_val = 0
-
+ 
         # TD update
-        target = reward + self.gamma * max_next_q_val
+        target = reward - self.avg_rew + max_next_q_val
 
         q_vals = self.get_q_values()
 

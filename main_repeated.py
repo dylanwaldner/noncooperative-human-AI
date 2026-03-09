@@ -38,9 +38,9 @@ def interactive_experiment():
         print("="*80)
         print("\nOptions:")
         print("1. Run complete experiment for a specific game")
-        print("2. Compare all games (summary)")
-        print("3. Run custom matchup")
-        print("4. Run Double Auction Game (Heavy Memory)")
+        print("2. Run custom matchup")
+        print("3. Run Double Auction Game (Heavy Memory)")
+        print("4. Run Complete Experiment End to End")
         print("5. Exit")
 
         choice = input("\nEnter choice (1-5): ").strip()
@@ -51,29 +51,35 @@ def interactive_experiment():
 
         num_experiments = int(input("\nEnter Number of Experiment Runs (Rec. For Prod Run: 30): ").strip())
 
-        print("\n" + "="*80)
-        print("Set State History (Recommended: Choose 0 or 2)")
-        print("="*80)
-        state_history = int(input("\nEnter Choice (< 3): ").strip())
+        if choice != '4':
 
-        print("\n" + "="*80)
-        print("SET REFERENCE POINT SETTING")
-        print("="*80)
-        print("\nOptions:")
-        print("1. Fixed (Set custom ref point)")
-        print("2. EMA")
-        print("3. Q (updates ref point based on max(Q(S, A)) at the current state. Normalized with (1-gamma) to move from expected discounted return scale to reward scale. ")
-        print("4. EMAOR (Exponential Moving Average over Opponent Rewards, basically tracks how well the opponent is doing not how well the player is doing")
-      
-        ref_setting = ""
-        viable_options = ['Fixed', 'EMA', 'Q', 'EMAOR']
+            print("\n" + "="*80)
+            print("Set State History (Recommended: Choose 0 or 2)")
+            print("="*80)
+            state_history = int(input("\nEnter Choice (< 3): ").strip())
 
-        while ref_setting not in viable_options:        
-            ref_setting = int(input("\nEnter choice (type the digit): ").strip())
-            ref_setting = viable_options[ref_setting-1]
+            print("\n" + "="*80)
+            print("SET REFERENCE POINT SETTING")
+            print("="*80)
+            print("\nOptions:")
+            print("1. Fixed (Set custom ref point)")
+            print("2. EMA")
+            print("3. Q (updates ref point based on max(Q(S, A)) at the current state. Normalized with (1-gamma) to move from expected discounted return scale to reward scale. ")
+            print("4. EMAOR (Exponential Moving Average over Opponent Rewards, basically tracks how well the opponent is doing not how well the player is doing")
+          
+            ref_setting = ""
+            viable_options = ['Fixed', 'EMA', 'Q', 'EMAOR']
 
-            if ref_setting not in viable_options:
-                print("Failed, please try again.")
+            while ref_setting not in viable_options:        
+                ref_setting = int(input("\nEnter choice (type the digit): ").strip())
+                ref_setting = viable_options[ref_setting-1]
+
+                if ref_setting not in viable_options:
+                    print("Failed, please try again.")
+
+        else:
+            episodes = input(f"Episodes to run (default 200): ").strip()
+            episodes = int(episodes) if episodes.isdigit() else 200
 
         r = None
         while r == None:
@@ -123,10 +129,10 @@ def interactive_experiment():
                 episodes = int(episodes) if episodes.isdigit() else 200
 
                 print(f"\nStarting complete experiment for {game_name}...")
-                all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history)
+                all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments)
 
                 # Compare results
-                compare_all_results(all_results, game_name)
+                compare_all_results(all_results, game_name, state_history, num_experiments)
             else:
                 print("Invalid choice, using Prisoner's Dilemma")
                 raise ValueError
@@ -136,71 +142,6 @@ def interactive_experiment():
                 compare_all_results(all_results, game_name)
 
         elif choice == '2':
-            # Compare all games
-            print("\nRunning summary comparison across all games...")
-
-            summary_data = []
-            test_games = ['PrisonersDilemma', 'MatchingPennies', 'BattleOfSexes', 'StagHunt', 'Chicken']
-
-            action_size = 2
-
-            for game_name in test_games:
-                print(f"\nAnalyzing {game_name}...")
-                payoff_matrix = games[game_name]['payoffs']
-
-                # Run quick version
-                env = RepeatedGameEnv(payoff_matrix, horizon=50, state_history=state_history)
-
-                # Test one key matchup
-                agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, agent_id=0, ref_setting=ref_setting)
-                agent2 = AIAgent(env.state_size, 2, 2, 1)
- 
-                agent1_type = "Learning_PT"
-                agent2_type = "AI"
- 
-                results = train_agents(agent1, agent2, env, episodes=100, verbose=False)
-
-                if results['avg_rewards1'] and len(results['avg_rewards1']) >= 20:
-                    final_avg1 = np.mean(results['avg_rewards1'][-20:])
-                    final_avg2 = np.mean(results['avg_rewards2'][-20:])
-
-                    summary_data.append({
-                        'Game': game_name,
-                        'Aware_PT_Avg': final_avg1,
-                        'AI_Avg': final_avg2,
-                        'Difference': final_avg1 - final_avg2,
-                        'Description': games[game_name]['description']
-                    })
-
-            # Display summary
-            if summary_data:
-                df = pd.DataFrame(summary_data)
-                print("\n" + "="*80)
-                print("SUMMARY COMPARISON ACROSS GAMES")
-                print("="*80)
-                print(df.to_string(index=False))
-
-                # Visualization
-                fig, ax = plt.subplots(figsize=(12, 6))
-
-                x = np.arange(len(df))
-                width = 0.35
-
-                ax.bar(x - width/2, df['Aware_PT_Avg'], width, label='Aware PT', alpha=0.7)
-                ax.bar(x + width/2, df['AI_Avg'], width, label='AI', alpha=0.7)
-
-                ax.set_xlabel('Game')
-                ax.set_ylabel('Average Reward')
-                ax.set_title('Aware PT vs AI Performance Across Games')
-                ax.set_xticks(x)
-                ax.set_xticklabels(df['Game'], rotation=45, ha='right')
-                ax.legend()
-                ax.grid(True, alpha=0.3, axis='y')
-
-                plt.tight_layout()
-                plt.show()
-
-        elif choice == '3':
             # Custom matchup
             print("\nCustom Matchup Configuration")
             print("-"*40)
@@ -221,8 +162,8 @@ def interactive_experiment():
                 payoff_matrix = games[game_name]['payoffs']
 
             # Select agent types
-            print("\nAgent types: 1) Aware_PT, 2) Learning_PT, 3) AI")
-            valid_types = ['Aware_PT', 'Learning_PT', 'AI']
+            print("\nAgent types: 1) AH, 2) LH, 3) AI")
+            valid_types = ['AH', 'LH', 'AI']
             agent1_type, agent2_type = "", ""
           
             while agent1_type not in valid_types or agent2_type not in valid_types:
@@ -248,21 +189,21 @@ def interactive_experiment():
 
             # Reference point setting
             # Options = Fixed, EMA, Q, EMAOR
-            ref_lambda = 0.9 
+            ref_lambda = 0.95 
 
             # Create agents
             action_size = 2
-            if agent1_type == 'Learning_PT':
+            if agent1_type == 'LH':
                 agent1 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 0, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
             elif agent1_type == "AI":
                 agent1 = AIAgent(env.state_size, 2, 2, 0)
 
-            if agent2_type == 'Learning_PT':
+            if agent2_type == 'LH':
                 agent2 = LearningHumanPTAgent(env.state_size, 2, 2, pt_params, 1, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
             elif agent2_type == 'AI':
                 agent2 = AIAgent(env.state_size, 2, 2, 1)
 
-            if agent1_type == 'Aware_PT':
+            if agent1_type == 'AH':
                 opp_params = dict()
                 opp_params['opponent_type'] = agent2_type
                 opp_params['opponent_action_size'] = action_size
@@ -273,7 +214,7 @@ def interactive_experiment():
                      
                 agent1 = AwareHumanPTAgent(payoff_matrix, pt_params, action_size, env.state_size, agent_id=0, opp_params=opp_params, ref_setting=ref_setting, lambda_ref = ref_lambda)
 
-            if agent2_type == 'Aware_PT':
+            if agent2_type == 'AH':
                 opp_params = dict()
                 opp_params['opponent_type'] = agent1_type
                 opp_params['opponent_action_size'] = action_size
@@ -296,14 +237,14 @@ def interactive_experiment():
             print('Agent 1 Softmax triggers: ', agent1.softmax_counter)
             print('Agent 2 Softmax triggers: ', agent2.softmax_counter)
             
-            if agent1_type != 'Aware_PT':
+            if agent1_type != 'AH':
                 agent1_q_vals = agent1.get_q_values()
                 print(f"Agent 1 state visits: {agent1.state_visit_counter}")
-                print(f"Agent 1 raw q values = {agent1_q_vals}, agent 1 normalized q values = {(1-agent1.gamma) * agent1_q_vals}")
+                print(f"Agent 1 raw q values = {agent1_q_vals}")
 
-            if agent2_type != 'Aware_PT':
+            if agent2_type != 'AH':
                 agent2_q_vals = agent2.get_q_values()
-                print(f"Agent 2 raw q values = {agent2_q_vals}, agent 2 normalized q values = {(1-agent2.gamma) * agent2_q_vals}")
+                print(f"Agent 2 raw q values = {agent2_q_vals}")
 
                 print(f"Agent 2 state visits: {agent2.state_visit_counter}")
 
@@ -314,10 +255,10 @@ def interactive_experiment():
             if hasattr(agent2, "beliefs"):
                 print(f"Agent 2 beliefs: {agent2.beliefs}")
 
-            analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params)
+            analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_setting, env)
 
 
-        elif choice == '4':
+        elif choice == '3':
             # Custom matchup
             print("\nDouble Auction Game")
             print("-"*40)
@@ -346,8 +287,8 @@ def interactive_experiment():
                     print("Invalid input, try again")
 
             # Select agent types
-            print("\nAgent types: Aware_PT, Learning_PT, AI")
-            valid_types = ['Aware_PT', 'Learning_PT', 'AI']
+            print("\nAgent types: AH, LH, AI")
+            valid_types = ['AH', 'LH', 'AI']
             agent1_type, agent2_type = "", ""
 
             while agent1_type not in valid_types or agent2_type not in valid_types:
@@ -373,29 +314,29 @@ def interactive_experiment():
 
             # Create agents
             action_size = price_range
-            if agent1_type == 'Learning_PT':
+            if agent1_type == 'LH':
                 agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, 0, ref_setting=ref_setting, lambda_ref = ref_lambda)
             elif agent1_type == "AI":
                 agent1 = AIAgent(env.state_size, action_size, action_size, 0)
 
-            if agent2_type == 'Learning_PT':
+            if agent2_type == 'LH':
                 agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, 1, ref_setting=ref_setting, lambda_ref = ref_lambda)
             elif agent2_type == 'AI':
                 agent2 = AIAgent(env.state_size, action_size, action_size, 1)
 
-            if agent1_type == 'Aware_PT':
+            if agent1_type == 'AH':
                 opp_params = dict()
                 opp_params['opponent_type'] = agent2_type
                 opp_params['opponent_action_size'] = action_size
                 opp_params['opp_ref'] = None
                 if agent2_type != "AI":
-                    if agent2_type == "Aware_PT":
+                    if agent2_type == "AH":
                         opp_params['opp_ref'] = 0 # Setting static for now, will have to coordinate with external variable 
                     else:
                         opp_params['opp_ref'] = agent2.ref_point
                 agent1 = AwareHumanPTAgent(payoff_matrix, pt_params, action_size, env.state_size, agent_id=0, opp_params=opp_params, ref_setting=ref_setting, lambda_ref = ref_lambda)
 
-            if agent2_type == 'Aware_PT':
+            if agent2_type == 'AH':
                 opp_params = dict()
                 opp_params['opponent_type'] = agent1_type
                 opp_params['opponent_action_size'] = action_size
@@ -412,25 +353,39 @@ def interactive_experiment():
             print('Agent 1 Softmax triggers: ', agent1.softmax_counter)
             print('Agent 2 Softmax triggers: ', agent2.softmax_counter)
 
-            if agent1_type != 'Aware_PT':
+            if agent1_type != 'AH':
                 agent1_q_vals = agent1.get_q_values()
-                print(f"Agent 1 state visits: {agent1.state_visit_counter}")
-                print(f"Agent 1 raw q values = {agent1_q_vals}, agent 1 normalized q values = {(1-agent1.gamma) * agent1_q_vals}")
+                #print(f"Agent 1 state visits: {agent1.state_visit_counter}")
+                #print(f"Agent 1 raw q values = {agent1_q_vals}, agent 1 normalized q values = {(1-agent1.gamma) * agent1_q_vals}")
 
-            if agent2_type != 'Aware_PT':
+            if agent2_type != 'AH':
                 agent2_q_vals = agent2.get_q_values()
-                print(f"Agent 2 raw q values = {agent2_q_vals}, agent 2 normalized q values = {(1-agent2.gamma) * agent2_q_vals}")
+                #print(f"Agent 2 raw q values = {agent2_q_vals}, agent 2 normalized q values = {(1-agent2.gamma) * agent2_q_vals}")
 
-                print(f"Agent 2 state visits: {agent2.state_visit_counter}")
+                #print(f"Agent 2 state visits: {agent2.state_visit_counter}")
 
 
-            if hasattr(agent1, "beliefs") and price_range < 5:
-                print(f"Agent 1 beliefs: {agent1.beliefs}")
+            #if hasattr(agent1, "beliefs") and price_range < 5:
+                #print(f"Agent 1 beliefs: {agent1.beliefs}")
 
-            if hasattr(agent2, "beliefs") and price_range < 5:
-                print(f"Agent 2 beliefs: {agent2.beliefs}")
+            #if hasattr(agent2, "beliefs") and price_range < 5:
+                #print(f"Agent 2 beliefs: {agent2.beliefs}")
 
             analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params)
+
+        elif choice == '4':
+            for game_name in list(games.keys()):
+                state_histories = [0, 2]
+                for state_history in state_histories:
+                    ref_settings = ["EMA", "Q", "EMAOR"]
+                    for ref_setting in ref_settings:
+                        payoff_matrix = games[game_name]['payoffs']
+
+                        print(f"\nStarting complete experiment for {game_name}...")
+                        all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments)
+
+                        # Compare results
+                        data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting)
 
 
         elif choice == '5':

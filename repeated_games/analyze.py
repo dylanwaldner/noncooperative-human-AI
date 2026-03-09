@@ -5,13 +5,22 @@ import time
 from collections import Counter
 from matplotlib.ticker import FuncFormatter
 from .utils import smooth
+import os
+from pathlib import Path
 
-def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params):
+DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
+
+def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_type, env):
     """
     I am not going through in line, and i went a little in depth on the read me. 
     I feel like this is pretty straightforward, but if its not please just send me an email,
     I'll be quick to respond
     """
+    state_history = env.state_history    
+
+    path = Path(DIR_PATH) / f"game_{game_name}" / f"sh_{state_history}" / f"_matchup{agent1_type}_{agent2_type}"
+    os.makedirs(path, exist_ok=True)
+
     num_experiments = len(results.keys())
 
     fig = plt.figure(figsize=(15, 10))
@@ -58,7 +67,6 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
 
     for idx in range(len(results.keys())):
         ref_points1 = results[f"{idx}"]['ref_points1']
-        print("Ref Points 1: ", ref_points1)
         ref_points2 = results[f"{idx}"]['ref_points2']
 
         ref_points_p1.append(ref_points1)
@@ -151,14 +159,15 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
         ax4.fill_between(x, mean_q_p1[:, 0, 0] + 1.96 * se_q_p1[:, 0, 0], mean_q_p1[:, 0, 0] - 1.96 * se_q_p1[:, 0, 0], alpha=0.3)
         ax4.fill_between(x, mean_q_p1[:, 1, 0] + 1.96 * se_q_p1[:, 1, 0], mean_q_p1[:, 1, 0] - 1.96 * se_q_p1[:, 1, 0], alpha=0.3)
 
+        '''
         opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()
         expected_payoff_a0 = payoff_matrix[0, :, 0] @ opp_freq
         expected_payoff_a1 = payoff_matrix[1, :, 0] @ opp_freq
         ax4.axhline(expected_payoff_a0, linestyle="--", color='gray', alpha=0.5, label="Expected R(a0)")
         ax4.axhline(expected_payoff_a1, linestyle="--", color='black', alpha=0.5, label="Expected R(a1)")
-
+        '''
     ax4.set_xlabel('Step')
-    ax4.set_ylabel('Normalized Q-value')
+    ax4.set_ylabel('Q-value')
     ax4.set_title(f'95% Conf. Interval {agent1_type} Q-Values Over {len(results.keys())} Runs')
     ax4.legend()
 
@@ -183,14 +192,16 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
         ax5.fill_between(x, mean_q_p2[:, 0, 0] + 1.96 * se_q_p2[:, 0, 0], mean_q_p2[:, 0, 0] - 1.96 * se_q_p2[:, 0, 0], alpha=0.3)
         ax5.fill_between(x, mean_q_p2[:, 1, 0] + 1.96 * se_q_p2[:, 1, 0], mean_q_p2[:, 1, 0] - 1.96 * se_q_p2[:, 1, 0], alpha=0.3)
 
+        '''
         opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()
         expected_payoff_a0 = payoff_matrix[:, 0, 1] @ opp_freq
         expected_payoff_a1 = payoff_matrix[:, 1, 1] @ opp_freq
         ax5.axhline(expected_payoff_a0, linestyle="--", color='gray', alpha=0.5, label="Expected R(a0)")
         ax5.axhline(expected_payoff_a1, linestyle="--", color='black', alpha=0.5, label="Expected R(a1)")
+        '''
 
     ax5.set_xlabel('Step')
-    ax5.set_ylabel('Normalized Q-value')
+    ax5.set_ylabel('Q-value')
     ax5.set_title(f'95% Conf. Interval {agent2_type} Q-Values Over {len(results.keys())} Runs')
     ax5.legend()
 
@@ -331,106 +342,519 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     ax8.legend()
     ax8.grid(True, alpha=0.3)
 
-    if game_name == 'PrisonersDilemma': # PT NE == PT EB
-        optimal_policies = [(0, 1), (0, 1)]
-    elif game_name == 'MatchingPennies': # PT NE == PT EB
-        optimal_policies = [(0.5, 0.5), (0.5, 0.5)]
-
-    elif game_name == 'OchsGame':
-        pass
-
-
     plt.suptitle(f'{game_name}: {agent1_type} vs {agent2_type}', fontsize=16, y=1.02)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(path / f"{ref_type}.png")
+    #plt.show()
 
-def compare_all_results(all_results, game_name):
-    """Compare performance across all matchups"""
+def compare_all_results(all_results, game_name, state_history, num_experiments, ref_type):
+    """Compare performance across all matchups using the last 50 episodes of each run.
 
-    print("\n" + "="*80)
+    Assumes:
+        all_results[matchup_key]['results']['avg_rewards1'] has shape (num_runs, num_episodes)
+        all_results[matchup_key]['results']['avg_rewards2'] has shape (num_runs, num_episodes)
+
+    Returns:
+        comparison_data: list[dict]
+    """
+
+    print("\n" + "=" * 80)
     print(f"COMPARISON ACROSS ALL MATCHUPS: {game_name}")
-    print("="*80)
+    print("=" * 80)
+
+    path = Path(DIR_PATH) / f"game_{game_name}" / f"sh_{state_history}"
+    path.mkdir(parents=True, exist_ok=True)
 
     comparison_data = []
+    last_n = 50
 
     for matchup_key, data in all_results.items():
-        results = data['results']
+        runs = data["results"]
 
-        if results['avg_rewards1'] and len(results['avg_rewards1']) >= 50:
-            final_avg1 = np.mean(results['avg_rewards1'][-50:])
-            final_avg2 = np.mean(results['avg_rewards2'][-50:])
-            std1 = np.std(results['avg_rewards1'][-50:])
-            std2 = np.std(results['avg_rewards2'][-50:])
+        run_means1 = []
+        run_means2 = []
 
-            comparison_data.append({
-                'Matchup': matchup_key,
-                'Agent1_Avg': final_avg1,
-                'Agent1_Std': std1,
-                'Agent2_Avg': final_avg2,
-                'Agent2_Std': std2,
-                'Total_Avg': (final_avg1 + final_avg2) / 2,
-                'Difference': abs(final_avg1 - final_avg2)
-            })
+        for run_id, run_results in runs.items():
+
+            rewards1 = np.asarray(run_results.get("avg_rewards1", []), dtype=float)
+            rewards2 = np.asarray(run_results.get("avg_rewards2", []), dtype=float)
+
+            if len(rewards1) < last_n or len(rewards2) < last_n:
+                continue
+
+            run_means1.append(np.mean(rewards1[-last_n:]))
+            run_means2.append(np.mean(rewards2[-last_n:]))
+
+        if not run_means1 or not run_means2:
+            continue
+
+        run_means1 = np.asarray(run_means1)
+        run_means2 = np.asarray(run_means2)
+
+        final_avg1 = run_means1.mean()
+        final_avg2 = run_means2.mean()
+
+        # 95% CI across runs
+        if len(run_means1) > 1:
+            ci1 = 1.96 * run_means1.std(ddof=1) / np.sqrt(len(run_means1))
+        else:
+            ci1 = 0.0
+
+        if len(run_means2) > 1:
+            ci2 = 1.96 * run_means2.std(ddof=1) / np.sqrt(len(run_means2))
+        else:
+            ci2 = 0.0
+
+        comparison_data.append({
+            "Matchup": matchup_key,
+            "Agent1_Avg": final_avg1,
+            "Agent1_CI": ci1,
+            "Agent2_Avg": final_avg2,
+            "Agent2_CI": ci2,
+            "Total_Avg": (final_avg1 + final_avg2) / 2,
+            "Difference": abs(final_avg1 - final_avg2),
+            "Num_Runs": len(run_means1)
+        })
+    if not comparison_data:
+        print("\nNo valid comparison data found.")
+        return comparison_data
 
     # Create comparison table
-    if comparison_data:
-        df = pd.DataFrame(comparison_data)
-        df = df.sort_values('Total_Avg', ascending=False)
+    df = pd.DataFrame(comparison_data)
+    df = df.sort_values("Total_Avg", ascending=False)
 
-        print("\nPerformance Comparison (last 50 episodes):")
-        print(df.to_string(index=False))
+    print("\nPerformance Comparison (mean of last 50 episodes across runs):")
+    print(df.to_string(index=False))
 
-        # Visualization
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(16, 12))
 
-        # Bar plot of average rewards
-        matchups = df['Matchup'].tolist()
-        agent1_avgs = df['Agent1_Avg'].tolist()
-        agent2_avgs = df['Agent2_Avg'].tolist()
+    # ------------------------------------------------------------------
+    # Bar plot of average rewards with 95% CI
+    # ------------------------------------------------------------------
+    matchups = df["Matchup"].tolist()
+    agent1_avgs = df["Agent1_Avg"].to_numpy()
+    agent2_avgs = df["Agent2_Avg"].to_numpy()
+    agent1_cis = df["Agent1_CI"].to_numpy()
+    agent2_cis = df["Agent2_CI"].to_numpy()
 
-        x = np.arange(len(matchups))
-        width = 0.35
+    x = np.arange(len(matchups))
+    width = 0.35
 
-        ax1.bar(x - width/2, agent1_avgs, width, label='Agent 1', alpha=0.7)
-        ax1.bar(x + width/2, agent2_avgs, width, label='Agent 2', alpha=0.7)
-        ax1.set_xlabel('Matchup')
-        ax1.set_ylabel('Average Reward')
-        ax1.set_title(f'Average Rewards by Matchup\n{game_name}')
-        ax1.set_xticks(x)
-        ax1.set_xticklabels(matchups, rotation=45, ha='right')
-        ax1.legend()
-        ax1.grid(True, alpha=0.3, axis='y')
+    ax1.bar(
+        x - width / 2,
+        agent1_avgs,
+        width,
+        yerr=agent1_cis,
+        label="Agent 1",
+        alpha=0.7,
+        capsize=4,
+    )
+    ax1.bar(
+        x + width / 2,
+        agent2_avgs,
+        width,
+        yerr=agent2_cis,
+        label="Agent 2",
+        alpha=0.7,
+        capsize=4,
+    )
 
-        # Heatmap of total average
-        matchup_matrix = np.zeros((3, 3))
-        matchup_names = ['Aware_PT', 'Learning_PT', 'AI']
+    ax1.set_xlabel("Matchup")
+    ax1.set_ylabel("Average Reward")
+    ax1.set_title(f"Average Rewards by Matchup")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(matchups, rotation=45, ha="right")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3, axis="y")
 
-        for i, agent1 in enumerate(matchup_names):
-            for j, agent2 in enumerate(matchup_names):
-                key = f"{agent1}_vs_{agent2}"
-                if key in all_results:
-                    results = all_results[key]['results']
-                    if results['avg_rewards1']:
-                        avg1 = np.mean(results['avg_rewards1'][-50:])
-                        avg2 = np.mean(results['avg_rewards2'][-50:])
-                        matchup_matrix[i, j] = (avg1 + avg2) / 2
+    ######################################
+    ######## Policy comparisons ##########
+    ######################################
 
-        im = ax2.imshow(matchup_matrix, cmap='viridis')
-        ax2.set_xticks(range(len(matchup_names)))
-        ax2.set_yticks(range(len(matchup_names)))
-        ax2.set_xticklabels(matchup_names)
-        ax2.set_yticklabels(matchup_names)
-        ax2.set_title('Total Average Reward Heatmap')
+    last_n = 50
 
-        # Add text annotations
-        for i in range(len(matchup_names)):
-            for j in range(len(matchup_names)):
-                text = ax2.text(j, i, f'{matchup_matrix[i, j]:.2f}',
-                              ha="center", va="center", color="w")
+    policy_rows = []
 
-        plt.colorbar(im, ax=ax2)
-        plt.tight_layout()
-        plt.show()
+    for matchup_key, data in all_results.items():
+        runs = data["results"]
 
+        run_probs = {
+            "P1_A0": [],
+            "P1_A1": [],
+            "P2_A0": [],
+            "P2_A1": [],
+        }
+
+        for run_id, exp in runs.items():
+            actions_1 = exp["actions1"]
+            actions_2 = exp["actions2"]
+
+            last_actions_1 = actions_1[-last_n:]
+            last_actions_2 = actions_2[-last_n:]
+
+            flat_1 = [a for ep in last_actions_1 for a in ep]
+            flat_2 = [a for ep in last_actions_2 for a in ep]
+
+            if len(flat_1) == 0 or len(flat_2) == 0:
+                continue
+
+            c1 = Counter(flat_1)
+            c2 = Counter(flat_2)
+
+            total1 = sum(c1.values())
+            total2 = sum(c2.values())
+
+            run_probs["P1_A0"].append(c1.get(0, 0) / total1)
+            run_probs["P1_A1"].append(c1.get(1, 0) / total1)
+            run_probs["P2_A0"].append(c2.get(0, 0) / total2)
+            run_probs["P2_A1"].append(c2.get(1, 0) / total2)
+
+        if len(run_probs["P1_A0"]) == 0:
+            continue
+
+        row = {"Matchup": matchup_key}
+        for key, vals in run_probs.items():
+            arr = np.asarray(vals, dtype=float)
+            row[f"{key}_Mean"] = arr.mean()
+            row[f"{key}_CI"] = 1.96 * arr.std(ddof=1) / np.sqrt(len(arr)) if len(arr) > 1 else 0.0
+
+        policy_rows.append(row)
+
+    policy_df = pd.DataFrame(policy_rows)
+
+    matchups = policy_df["Matchup"].tolist()
+    x = np.arange(len(matchups))
+    width = 0.18
+
+    ax2.bar(
+        x - 1.5 * width,
+        policy_df["P1_A0_Mean"],
+        width,
+        yerr=policy_df["P1_A0_CI"],
+        capsize=4,
+        label="Player 1: Action 0",
+        alpha=0.8,
+    )
+    ax2.bar(
+        x - 0.5 * width,
+        policy_df["P1_A1_Mean"],
+        width,
+        yerr=policy_df["P1_A1_CI"],
+        capsize=4,
+        label="Player 1: Action 1",
+        alpha=0.8,
+    )
+    ax2.bar(
+        x + 0.5 * width,
+        policy_df["P2_A0_Mean"],
+        width,
+        yerr=policy_df["P2_A0_CI"],
+        capsize=4,
+        label="Player 2: Action 0",
+        alpha=0.8,
+    )
+    ax2.bar(
+        x + 1.5 * width,
+        policy_df["P2_A1_Mean"],
+        width,
+        yerr=policy_df["P2_A1_CI"],
+        capsize=4,
+        label="Player 2: Action 1",
+        alpha=0.8,
+    )
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(matchups, rotation=45, ha="right")
+    ax2.set_ylabel("Final Action Probability")
+    ax2.set_xlabel("Matchup")
+    ax2.set_title(f"Converged Policy Distribution by Matchup")
+    ax2.legend()
+    ax2.grid(True, alpha=0.3, axis="y")
+
+    # CPT Transformation Action Change Rate
+
+    action_change_rows = []
+
+    for matchup_key, data in all_results.items():
+        runs = data["results"]
+
+        run_rates_1 = []
+        run_rates_2 = []
+
+        for run_id, exp in runs.items():
+            flags_1 = np.asarray(exp.get("action_changed_flags1", []), dtype=float)
+            flags_2 = np.asarray(exp.get("action_changed_flags2", []), dtype=float)
+
+            if flags_1.size > 0:
+                run_rates_1.append(flags_1.mean())
+
+            if flags_2.size > 0:
+                run_rates_2.append(flags_2.mean())
+
+        if len(run_rates_1) == 0 and len(run_rates_2) == 0:
+            continue
+
+        row = {"Matchup": matchup_key}
+
+        if len(run_rates_1) > 0:
+            arr1 = np.asarray(run_rates_1, dtype=float)
+            row["P1_FlipRate_Mean"] = arr1.mean()
+            row["P1_FlipRate_CI"] = 1.96 * arr1.std(ddof=1) / np.sqrt(len(arr1)) if len(arr1) > 1 else 0.0
+        else:
+            row["P1_FlipRate_Mean"] = 0.0
+            row["P1_FlipRate_CI"] = 0.0
+
+        if len(run_rates_2) > 0:
+            arr2 = np.asarray(run_rates_2, dtype=float)
+            row["P2_FlipRate_Mean"] = arr2.mean()
+            row["P2_FlipRate_CI"] = 1.96 * arr2.std(ddof=1) / np.sqrt(len(arr2)) if len(arr2) > 1 else 0.0
+        else:
+            row["P2_FlipRate_Mean"] = 0.0
+            row["P2_FlipRate_CI"] = 0.0
+
+        action_change_rows.append(row)
+
+    action_change_df = pd.DataFrame(action_change_rows)
+
+    matchups = action_change_df["Matchup"].tolist()
+    x = np.arange(len(matchups))
+    width = 0.35
+
+    ax3.bar(
+        x - width / 2,
+        action_change_df["P1_FlipRate_Mean"],
+        width,
+        yerr=action_change_df["P1_FlipRate_CI"],
+        capsize=4,
+        label="Player 1",
+        alpha=0.8,
+    )
+
+    ax3.bar(
+        x + width / 2,
+        action_change_df["P2_FlipRate_Mean"],
+        width,
+        yerr=action_change_df["P2_FlipRate_CI"],
+        capsize=4,
+        label="Player 2",
+        alpha=0.8,
+    )
+
+    '''
+    for i, v in enumerate(action_change_df["P1_FlipRate_Mean"]):
+        ax3.text(
+        x[i] - width/2,
+        v + max(action_change_df["P1_FlipRate_Mean"]) * 0.1,
+        f"{v:.2f}",
+        ha="center",
+        va="bottom",
+        fontsize=9
+        )
+
+    for i, v in enumerate(action_change_df["P2_FlipRate_Mean"]):
+        ax3.text(
+        x[i] + width/2,
+        v + max(action_change_df["P1_FlipRate_Mean"]) * 0.1,
+        f"{v:.2f}",
+        ha="center",
+        va="bottom",
+        fontsize=9
+        )
+    '''
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(matchups, rotation=45, ha="right")
+    ax3.set_ylabel("CPT Decision Flip Rate")
+    ax3.set_xlabel("Matchup")
+    ax3.set_title("CPT Preference Reversal Rate by Matchup")
+    ax3.legend()
+    ax3.grid(True, alpha=0.3, axis="y")
+
+    # CPT Transformation Magnitude
+
+    l2_rows = []
+
+    for matchup_key, data in all_results.items():
+        runs = data["results"]
+
+        run_l2_1 = []
+        run_l2_2 = []
+
+        for run_id, exp in runs.items():
+            dists_1 = np.asarray(exp.get("pt_l2_dists1", []), dtype=float)
+            dists_2 = np.asarray(exp.get("pt_l2_dists2", []), dtype=float)
+
+            if dists_1.size > 0:
+                run_l2_1.append(dists_1.mean())
+
+            if dists_2.size > 0:
+                run_l2_2.append(dists_2.mean())
+
+        if len(run_l2_1) == 0 and len(run_l2_2) == 0:
+            continue
+
+        row = {"Matchup": matchup_key}
+
+        if len(run_l2_1) > 0:
+            arr1 = np.asarray(run_l2_1, dtype=float)
+            row["P1_L2_Mean"] = arr1.mean()
+            row["P1_L2_CI"] = 1.96 * arr1.std(ddof=1) / np.sqrt(len(arr1)) if len(arr1) > 1 else 0.0
+        else:
+            row["P1_L2_Mean"] = 0.0
+            row["P1_L2_CI"] = 0.0
+
+        if len(run_l2_2) > 0:
+            arr2 = np.asarray(run_l2_2, dtype=float)
+            row["P2_L2_Mean"] = arr2.mean()
+            row["P2_L2_CI"] = 1.96 * arr2.std(ddof=1) / np.sqrt(len(arr2)) if len(arr2) > 1 else 0.0
+        else:
+            row["P2_L2_Mean"] = 0.0
+            row["P2_L2_CI"] = 0.0
+
+        l2_rows.append(row)
+
+    l2_df = pd.DataFrame(l2_rows)
+
+    matchups = l2_df["Matchup"].tolist()
+    x = np.arange(len(matchups))
+    width = 0.35
+
+    ax4.bar(
+        x - width / 2,
+        l2_df["P1_L2_Mean"],
+        width,
+        yerr=l2_df["P1_L2_CI"],
+        capsize=4,
+        label="Player 1",
+        alpha=0.8,
+    )
+
+    ax4.bar(
+        x + width / 2,
+        l2_df["P2_L2_Mean"],
+        width,
+        yerr=l2_df["P2_L2_CI"],
+        capsize=4,
+        label="Player 2",
+        alpha=0.8,
+    )
+
+    ax4.set_xticks(x)
+    ax4.set_xticklabels(matchups, rotation=45, ha="right")
+    ax4.set_ylabel("Mean CPT-EU L2 Distance")
+    ax4.set_xlabel("Matchup")
+    ax4.set_title("CPT Transformation Magnitude by Matchup")
+    ax4.legend()
+    ax4.grid(True, alpha=0.3, axis="y")
+
+    # Reference point comparison
+
+    ref_rows = []
+
+    for matchup_key, data in all_results.items():
+        runs = data["results"]
+
+        run_final_refs_1 = []
+        run_final_refs_2 = []
+
+        for run_id, exp in runs.items():
+            refs_1 = np.asarray(exp.get("ref_points1", []), dtype=float)
+            refs_2 = np.asarray(exp.get("ref_points2", []), dtype=float)
+
+            if refs_1.size > 0:
+                run_final_refs_1.append(refs_1[-1])
+
+            if refs_2.size > 0:
+                run_final_refs_2.append(refs_2[-1])
+
+        row = {"Matchup": matchup_key}
+
+        if len(run_final_refs_1) > 0:
+            arr1 = np.asarray(run_final_refs_1, dtype=float)
+            row["P1_Ref_Mean"] = arr1.mean()
+            row["P1_Ref_CI"] = 1.96 * arr1.std(ddof=1) / np.sqrt(len(arr1)) if len(arr1) > 1 else 0.0
+        else:
+            row["P1_Ref_Mean"] = 0.0
+            row["P1_Ref_CI"] = 0.0
+
+        if len(run_final_refs_2) > 0:
+            arr2 = np.asarray(run_final_refs_2, dtype=float)
+            row["P2_Ref_Mean"] = arr2.mean()
+            row["P2_Ref_CI"] = 1.96 * arr2.std(ddof=1) / np.sqrt(len(arr2)) if len(arr2) > 1 else 0.0
+        else:
+            row["P2_Ref_Mean"] = 0.0
+            row["P2_Ref_CI"] = 0.0
+
+        ref_rows.append(row)
+
+    ref_df = pd.DataFrame(ref_rows)
+
+    matchups = ref_df["Matchup"].tolist()
+    x = np.arange(len(matchups))
+    width = 0.35
+
+    ax5.bar(
+        x - width / 2,
+        ref_df["P1_Ref_Mean"],
+        width,
+        yerr=ref_df["P1_Ref_CI"],
+        capsize=4,
+        label="Player 1",
+        alpha=0.8,
+    )
+
+    ax5.bar(
+        x + width / 2,
+        ref_df["P2_Ref_Mean"],
+        width,
+        yerr=ref_df["P2_Ref_CI"],
+        capsize=4,
+        label="Player 2",
+        alpha=0.8,
+    )
+
+    '''
+    for i, v in enumerate(ref_df["P1_Ref_Mean"]):
+        ax5.text(
+            x[i] - width / 2,
+            v,
+            f"{v:.2f}",
+            ha="center",
+            va="bottom" if v >= 0 else "top",
+            fontsize=9
+        )
+
+    for i, v in enumerate(ref_df["P2_Ref_Mean"]):
+        ax5.text(
+            x[i] + width / 2,
+            v,
+            f"{v:.2f}",
+            ha="center",
+            va="bottom" if v >= 0 else "top",
+            fontsize=9
+        )
+    '''
+
+    ax5.set_xticks(x)
+    ax5.set_xticklabels(matchups, rotation=45, ha="right")
+    ax5.set_ylabel("Final Reference Point")
+    ax5.set_xlabel("Matchup")
+    ax5.set_title("Final Reference Point by Matchup")
+    ax5.legend()
+    ax5.grid(True, alpha=0.3, axis="y")
+
+    ax6.axis("off")
+
+    fig.suptitle(f"{game_name} — Learning Results Across Matchups - Last {last_n} Episodes", fontsize=16)
+
+    fig.subplots_adjust(
+    top=0.90,
+    bottom=0.15,
+    hspace=0.45,
+    wspace=0.30
+    )   
+
+    #plt.show()
+
+    plt.savefig(path / f"{game_name}_{ref_type}_Comparison.png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
     return comparison_data
-

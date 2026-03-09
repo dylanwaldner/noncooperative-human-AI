@@ -14,18 +14,16 @@ class AwareHumanPTAgent:
     Compared to learning human, no beliefs and no RL, just a best reply agent. 
     """
 
-    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', lambda_ref=0.95):
+    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', lambda_ref=0.95, B=5):
         self.payoff_matrix = payoff_matrix
         self.pt = ProspectTheory(**pt_params)
-        print('AH PT PARAMS: ', pt_params)
 
         self.agent_id = agent_id  # 0 for row player, 1 for column player
         # Defaulted to 0.95, the number here is pretty arbitrary just the reference update parameter
         self.lam_r = lambda_ref
         self.ref_update_mode = ref_setting
-        print('AH: ', self.ref_update_mode)
 
-        self.bins = [[0.0, 0.19], [0.20, 0.39], [0.40, 0.59], [0.60, 0.79], [0.80, 1.0]]
+        self.B = B
 
         self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
 
@@ -37,7 +35,7 @@ class AwareHumanPTAgent:
         # env parameters
         self.action_size = action_size
         self.opp_action_size = opp_params['opponent_action_size']
-        self.state_size = state_size
+        self.state_size = state_size * B - 1
 
         # Important to know whether to apply pt transformation
         self.opponent_type = opp_params['opponent_type']
@@ -55,20 +53,26 @@ class AwareHumanPTAgent:
         # track ties
         self.softmax_counter = 0 
 
+        self.pt_l2_dists = []
+        self.action_changed_flags = []
+
     def transform_state(self, state):
         # Transform the states from the s(H) to s(H)B format
         # First, normalize for simplicity
-        denom = self.max_payoff - self.min_payoff
+        low = min(self.min_payoff, self.ref_point)
+        high = max(self.max_payoff, self.ref_point)
+
+        self.min_payoff, self.max_payoff = low, high
+
+        denom = high - low
         if denom == 0:
             norm_ref_point = 0
         else:
-            norm_ref_point = (self.ref_point - self.min_payoff) / denom
+            norm_ref_point = (self.ref_point - low) / denom
 
         ref_bin = None
-        for idx, b in enumerate(self.bins):
-            if b[0] <= norm_ref_point <= b[1]:
-                ref_bin = idx
-                break
+
+        ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
 
         if ref_bin is None:
             raise TypeError("Ref bin never updated")
@@ -123,19 +127,41 @@ class AwareHumanPTAgent:
         '''
         # One value for each of our actions
         best_vals = np.zeros(self.action_size)
+        
+        # To track the effect of CPT Transformation
+        EU_best_vals = np.zeros(self.action_size)
 
         for i in range(self.action_size):
             # Use precalculated opp response
             opp_response = opp_best_responses[i]
             value = matrix[i, opp_response, self.agent_id] # agent id indexes row/col
+            EU_best_vals[i] = value # EU
             # Always PT transforming here — it is degenerate so no need for full lottery (please confirm this)
             # My thinking is that we are not randomizing over our actions ever, and now we have certainty
             # over the opp action, so probabilities are degenerate and value transform is all that matters
             value = self.pt.value_function(value)
             best_vals[i] = value
 
+        pt_l2_dist = np.linalg.norm(best_vals - EU_best_vals)
+        self.pt_l2_dists.append(pt_l2_dist)
+
         # Get max value and second max val for tie breaks
         opt_a = np.argmax(best_vals) # best
+        # Check if the CPT transformation influences action decision
+        EU_opt_a = np.argmax(EU_best_vals)
+
+        tol = 1e-8
+
+        EU_diff = EU_best_vals[0] - EU_best_vals[1]
+        PT_diff = best_vals[0] - best_vals[1]
+
+        if abs(EU_diff) < tol or abs(PT_diff) < tol:
+            action_changed = 0
+        else:
+            action_changed = int(np.sign(EU_diff) != np.sign(PT_diff))
+
+        self.action_changed_flags.append(action_changed)
+
         subopt_vals = best_vals.copy() # copy to prevent in place mutilation
         subopt_vals[opt_a] = float("-inf") # maksk best option
         subopt_a = np.argmax(subopt_vals) # get max of masked best option list

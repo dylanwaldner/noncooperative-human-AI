@@ -24,13 +24,13 @@ class LearningHumanPTAgent:
         self.action_size = action_size
         self.opp_action_size = opp_action_size
         self.pt = ProspectTheory(**pt_params)
-        print('LH PT PARAMS: ', pt_params)
         self.agent_id = agent_id
         self.ref_point = pt_params['r']
 
-        self.bins = [[0.0, 0.19], [0.20, 0.39], [0.40, 0.59], [0.60, 0.79], [0.80, 1.0]]
 
         self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
+
+        self.B = B
 
         # Initialize beliefs function and q values as dictionaries
         self.beliefs = dict()
@@ -44,11 +44,10 @@ class LearningHumanPTAgent:
         # options: Fixed, EMA, Max Q value (conditioned on beliefs over opp actions), 
         # EMAOR (Opponent reward not own reward)
         self.ref_update_mode = ref_setting 
-        print(self.ref_update_mode, ref_setting)
        
         # Add an entry for each state populated with uniform probabilities over opponent action set size
         # And initialize q values
-        for state in range(self.state_size):
+        for state in range(self.state_size + 1):
             # Belief function is size: opp action size because they are beliefs over opponent actions
             # we divide by the action size to get equiprobably starting points
             self.beliefs[state] = np.ones(self.opp_action_size) / self.opp_action_size
@@ -63,7 +62,7 @@ class LearningHumanPTAgent:
 
         # Q-learning parameters, all from paper. Perhaps gamma could be set to 0.99?
         #self.gamma = 0.95 
-        self.avg_reward = 0.0
+        self.avg_rew = 0.0
         self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
@@ -77,21 +76,27 @@ class LearningHumanPTAgent:
         # Track raw vs PT rewards
         self.raw_rewards = []
         self.pt_rewards = []
+       
+        self.pt_l2_dists = []
+        self.action_changed_flags = []
 
     def transform_state(self, state):
         # Transform the states from the s(H) to s(H)B format
         # First, normalize for simplicity
-        denom = self.max_payoff - self.min_payoff
+        low = min(self.min_payoff, self.ref_point)
+        high = max(self.max_payoff, self.ref_point)
+
+        self.min_payoff, self.max_payoff = low, high
+
+        denom = high - low
         if denom == 0:
             norm_ref_point = 0
         else:
-            norm_ref_point = (self.ref_point - self.min_payoff) / denom
+            norm_ref_point = (self.ref_point - low) / denom
 
         ref_bin = None
-        for idx, b in enumerate(self.bins):
-            if b[0] <= norm_ref_point <= b[1]:
-                ref_bin = idx
-                break
+
+        ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
 
         if ref_bin is None:
             raise TypeError("Ref bin never updated")
@@ -106,11 +111,37 @@ class LearningHumanPTAgent:
 
         # Pathology detection (lines 14, 18, 19 in alg 1)
         ## Generate action values (see method below)
-        action_values = self.calculate_action_values(state)
+        action_values, EU_action_values = self.calculate_action_values(state)
+
+        # We get the L2 distance between the EU and CPT actions 
+        PT_L2_dist = np.linalg.norm(action_values - EU_action_values)
 
         ## Identify Optimal action for tie break check
         optimal_action = np.argmax(action_values) 
-        
+ 
+        # And then we check if the PT transformation caused a different action to be taken
+        EU_optimal_action = np.argmax(EU_action_values)
+
+        # And then, just to guard against argmax tiebreaking in weird ways, 
+        # We mark all near tie values to be False to ensure integrity
+        tol = 1e-8
+
+        EU_gap = EU_action_values[0] - EU_action_values[1]
+        PT_gap = action_values[0] - action_values[1]
+
+        # ignore ties
+        EU_tie = abs(EU_gap) < tol
+        PT_tie = abs(PT_gap) < tol
+
+        if EU_tie or PT_tie:
+            action_changed = 0
+        else:
+            action_changed = int(np.sign(EU_gap) != np.sign(PT_gap))
+ 
+
+        self.pt_l2_dists.append(PT_L2_dist)
+        self.action_changed_flags.append(action_changed)
+
         ## Identify second best action for tie break check
         ### copy to prevent mutating original
         non_optimal_actions = action_values.copy()
@@ -143,6 +174,8 @@ class LearningHumanPTAgent:
     def calculate_action_values(self, state):
         # Define action space
         action_values = np.zeros(self.action_size)
+        # This is for tracking the effect the PT transformation has (EU baseline)
+        EU_action_values = np.zeros(self.action_size)
         ## Calculate V for each state, opp action tuple by forming a lottery 
         # with Q vals and beliefs
         # The idea here is that each effective Q value Q(s, a) is conditioned on 
@@ -164,11 +197,15 @@ class LearningHumanPTAgent:
             # PT transformation using opp action values and beliefs, 
             # introduces human warping instead of just integrating
             action_val = self.pt.expected_pt_value(outcomes, probabilities) 
+            # Get EU value
+            EU_action_val = outcomes.dot(probabilities)
+
+            EU_action_values[action] = EU_action_val
 
             # Update the list
             action_values[action] = action_val
 
-        return action_values
+        return action_values, EU_action_values
 
     def belief_update(self, state, opp_action):
         # Simple EMA for belief updates
@@ -177,10 +214,6 @@ class LearningHumanPTAgent:
         self.beliefs[state] = self.lam_b * self.beliefs[state] + (1 - self.lam_b) * one_hot
 
     def ref_update(self, payoff, state, opp_payoff):
-        # Just a debug check here
-        if sum(self.state_visit_counter.values()) == 1:
-            print(f"update mode: {self.ref_update_mode}")
-
         # Just slowly moving in the new direction instead of all at once, this seems sufficient for our pruposes
         # alternatively we could do some kind of bayesian update, but that feels like overkill to me
         if self.ref_update_mode == "EMA":
@@ -196,7 +229,7 @@ class LearningHumanPTAgent:
                 # I chose the PT transformation for the reference point and not the expectation
                 # because our reference point is a part of our decision making process, not learning, which
                 # we defined as pt warped and not in outcome space
-                weighted_q_val = self.pt.expected_value(self.q_values[state][action], self.beliefs[state])
+                weighted_q_val = self.pt.expected_pt_value(self.q_values[state][action], self.beliefs[state])
                 weighted_q_vals[action] = weighted_q_val
             max_q_val = weighted_q_vals.max()
             
@@ -255,8 +288,11 @@ class LearningHumanPTAgent:
         # Get stored value (state, joint action value) for bootstrap 
         q_value = self.q_values[state][action][opp_action]
 
+        if self.state_size == 1:
+            optimal_next_q_val = 0
+
         # Calculate delta in untransformed reward space
-        delta = reward - self.avg_reward + optimal_next_q_value - q_value 
+        delta = reward - self.avg_rew + optimal_next_q_value - q_value 
         # Update q values
         self.q_values[state][action][opp_action] += self.alpha * delta
 

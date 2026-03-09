@@ -49,7 +49,11 @@ def train_agents(agent1, agent2, env, episodes=500,
     last_time = start_time
 
     log_every = 100
-    global_step = 0
+    global_step = 1
+
+    # Reset metrics
+    agent1.pt_l2_dists, agent2.pt_l2_dists = [], []
+    agent1.action_changed_flags, agent2.action_changed_flags = [], []
 
     # Defined to initialize BR agents, agent1 and agent 2 actions sizes always the same for this setup
     action_size = agent1.action_size
@@ -72,6 +76,7 @@ def train_agents(agent1, agent2, env, episodes=500,
         episode_br2 = []
 
         for _ in range(env.horizon):
+            # We transform the PT agents states to include ref bins
             if not isinstance(agent1, AIAgent):
                 pt_state1 = agent1.transform_state(state)
                 action1 = agent1.act(pt_state1)
@@ -109,6 +114,7 @@ def train_agents(agent1, agent2, env, episodes=500,
             if isinstance(agent1, LearningHumanPTAgent):
                 # Updates
                 agent1.belief_update(pt_state1, action2)
+                agent1.avg_rew += (reward1 - agent1.avg_rew) / global_step 
                 agent1.q_value_update(pt_state1, pt_next_state1, action1, action2, reward1, done)
 
                 q_vals = agent1.get_q_values()
@@ -127,6 +133,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
             elif isinstance(agent1, AIAgent):
                 # Update code here
+                agent1.avg_rew += (reward1 - agent1.avg_rew) / global_step
                 agent1.update(state, action1, next_state, reward1, done)
 
                 # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
@@ -149,6 +156,7 @@ def train_agents(agent1, agent2, env, episodes=500,
             if isinstance(agent2, LearningHumanPTAgent):
                 # Update LH variables
                 agent2.belief_update(pt_state2, action1)
+                agent2.avg_rew += (reward2 - agent2.avg_rew) / global_step
                 agent2.q_value_update(pt_state2, pt_next_state2, action2, action1, reward2, done)
 
                 # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
@@ -167,6 +175,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
             elif isinstance(agent2, AIAgent):
                 # Update code here
+                agent2.avg_rew += (reward2 - agent2.avg_rew) / global_step
                 agent2.update(state, action2, next_state, reward2, done)
                 q_vals = agent2.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)
@@ -240,13 +249,25 @@ def train_agents(agent1, agent2, env, episodes=500,
 
         last_time = time.time()
 
-    print("joint actions: ", joint_counts)
-    print("State History: ", env.state_history)
     results['joint_actions'] = joint_counts
+    results['pt_l2_dists1'], results['pt_l2_dists2'] = [], []
+    results['action_changed_flags1'], results['action_changed_flags2'] = [], []
+
+    if hasattr(agent1, "pt_l2_dists"):
+        results['pt_l2_dists1'] = agent1.pt_l2_dists.copy()
+
+    if hasattr(agent1, "action_changed_flags"):
+        results['action_changed_flags1'] = agent1.action_changed_flags.copy()
+
+    if hasattr(agent2, "pt_l2_dists"):
+        results['pt_l2_dists2'] = agent2.pt_l2_dists.copy()
+
+    if hasattr(agent2, "action_changed_flags"):
+        results['action_changed_flags2'] = agent2.action_changed_flags.copy()
 
     return results
 
-def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting='Fixed', pt_params={}, ref_point=0, state_history=2):
+def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting='Fixed', pt_params={}, ref_point=0, state_history=2, num_experiments=30):
     """
     Run all agent matchups for a game
     This is pretty much deprecated, I intend to run via custom game or I will edit this.
@@ -264,23 +285,36 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
     # Reference point setting
     # Options = Fixed, EMA, Q, 'EMAOR': EMA of Opp rewards
-    ref_lambda = 0.9
+    ref_lambda = 0.95
 
     # Define all matchups to test
-    matchups = [
-        ('Aware_PT', 'AI'),
-        ('AI', 'Aware_PT'),
+    if game_name in ["PrisonersDilemma","StagHunt", "Chicken"]:
+        matchups = [
+        ('AH', 'AI'),
+
+        ('LH', 'AI'),
+
+        ('AH', 'LH'),
+
+        ('AH', 'AH'), # Baseline
+        ('LH', 'LH'),
+        ('AI', 'AI')  
+        ]
+    else:
+        matchups = [
+        ('AH', 'AI'),
+        ('AI', 'AH'),
 
         ('LH', 'AI'),
         ('AI', 'LH'),
 
-        ('Aware_PT', 'LH'),
-        ('LH', 'Aware_PT'),
+        ('AH', 'LH'),
+        ('LH', 'AH'),
 
-        ('Aware_PT', 'Aware_PT'), # Baseline
+        ('AH', 'AH'), # Baseline
         ('LH', 'LH'),
         ('AI', 'AI')  
-    ]
+        ]   
 
     all_results = {}
 
@@ -296,16 +330,16 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         ## 2x2 games only
         action_size = 2
         if agent1_type == 'LH':
-            agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, agent_id=0, ref_setting=ref_setting, lambda_ref = ref_lambda)
+            agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, agent_id=0, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
         elif agent1_type == 'AI':  # AI
             agent1 = AIAgent(env.state_size, action_size, action_size, agent_id=0)
 
         if agent2_type == 'LH':
-            agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, agent_id=1, ref_setting=ref_setting, lambda_ref=ref_lambda)
+            agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, agent_id=1, ref_setting=ref_setting, lambda_ref=ref_lambda, payoff_matrix=payoff_matrix)
         elif agent2_type == 'AI':  # AI
             agent2 = AIAgent(env.state_size, action_size, action_size, agent_id=1)
 
-        if agent1_type == 'Aware_PT':
+        if agent1_type == 'AH':
             opp_params = dict()
             opp_params['opponent_type'] = agent2_type
             opp_params['opponent_action_size'] = action_size
@@ -317,15 +351,13 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
             agent1 = AwareHumanPTAgent(payoff_matrix, pt_params, action_size, env.state_size, agent_id=0, opp_params=opp_params,ref_setting=ref_setting, lambda_ref=ref_lambda)
 
-        if agent2_type == 'Aware_PT':
+        if agent2_type == 'AH':
             opp_params = dict()
             opp_params['opponent_type'] = agent1_type
-            print(agent1_type)
             opp_params['opponent_action_size'] = action_size
             opp_params['opp_ref'] = None
 
             if agent1_type != "AI": # PT agent
-                print('hello')
                 opp_params['opp_ref'] = ref_point
                 opp_params['opp_pt'] = pt_params
 
@@ -333,8 +365,12 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
 
         # Train the matchup
-        print(f"Training {episodes} episodes...")
-        results = train_agents(agent1, agent2, env, {}, episodes=episodes, verbose=True, game_name=game_name)
+        print(f"Training {episodes} episodes in {game_name} between {agent1_type} vs {agent2_type}...")
+        results = dict()
+        for idx in range(num_experiments):
+            print(f'\nRun {idx + 1} / {num_experiments}')
+            results[f"{idx}"] = train_agents(agent1, agent2, env, episodes=episodes, verbose=True)
+            
 
         # Store results
         matchup_key = f"{agent1_type}_vs_{agent2_type}"
@@ -346,7 +382,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
         # Analyze this matchup
         games_dict = get_all_games()
-        analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params)
+        analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_setting, env)
 
     return all_results
 

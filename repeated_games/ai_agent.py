@@ -89,19 +89,17 @@ class AIAgent:
         # Get the present state value
         curr_q_val = self.q_values[state][action]
 
-        # Get the max val for the next state
-        max_next_q_val = self.q_values[next_state].max()
+        # Get the max val for the average state q value
+        avg_q_val = self.get_q_values()[:, 0]
+        max_avg_q_val = avg_q_val.max()
 
         if self.state_size == 1:
-            max_next_q_val = 0
+            max_avg_q_val = 0
  
         # TD update
-        target = reward - self.avg_rew + max_next_q_val
+        target = reward + max_avg_q_val
 
-        q_vals = self.get_q_values()
-
-
-        # COnvex combination style, just a stylistic difference not a numeric one
+        # Convex combination style, just a stylistic difference not a numeric one
         self.q_values[state][action] = (1 - self.alpha) * curr_q_val + self.alpha * target  
        
     # Deprecated Code for the Q-Value convergence metric I was fixated on

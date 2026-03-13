@@ -262,8 +262,8 @@ class LearningHumanPTAgent:
         self.state_visit_counter[state] += 1
 
         ## get next state for q vals and beliefs
-        q_values = self.q_values[next_state]
-        beliefs = self.beliefs[next_state]
+        q_values = self.get_q_values()
+        beliefs = self.get_avg_beliefs()
         #print(f"beliefs: {beliefs}")
 
         # Get maximuj value (not index)
@@ -275,7 +275,7 @@ class LearningHumanPTAgent:
         # Integrate out opp actions (Q(s, a_i, a_-i) -> Q(s, a_i)) in line with PT EB philosophy
         # Then get the max for the bellman update (max Q(s, a))
         for a_prime in range(self.action_size):
-            q_val = q_values[a_prime] # recall that we have already selected the next state above
+            q_val = q_values[a_prime] # this is the average value of this action across states
 
             # linear expectation of beliefs and values (integrate out opp acts)
             # no pt here because we don't want non linearities in the learning space, just in the decision space
@@ -287,11 +287,6 @@ class LearningHumanPTAgent:
             if weighted_q_val > optimal_next_q_value + eps:
                 optimal_next_q_value = weighted_q_val
 
-            # Tie breaker (randomly choose, maybe random is not the right choice here? Should average out)
-            elif np.abs(weighted_q_val - optimal_next_q_value) <= eps:
-                if random.random() < 0.5:
-                    optimal_next_q_value = weighted_q_val
-
         # Get stored value (state, joint action value) for bootstrap 
         q_value = self.q_values[state][action][opp_action]
 
@@ -299,9 +294,9 @@ class LearningHumanPTAgent:
             optimal_next_q_value = 0
 
         # Calculate delta in untransformed reward space
-        delta = reward - self.avg_rew + optimal_next_q_value - q_value 
+        delta = reward + optimal_next_q_value 
         # Update q values
-        self.q_values[state][action][opp_action] += self.alpha * delta
+        self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta
 
     # Deprecated from the q value convergence metric i was talking about
     # im not removing it because I am attached to it, but its not hurting anything
@@ -324,6 +319,24 @@ class LearningHumanPTAgent:
             q_values += weight * q_vals
 
         return q_values
+
+    def get_avg_beliefs(self):
+        avg_beliefs = np.zeros(self.opp_action_size)
+
+        total_visits = sum(self.state_visit_counter.values())
+  
+        if total_visits == 0:
+            return avg_beliefs
+
+
+        for state, value in self.beliefs.items():
+            weight = self.state_visit_counter[state]
+            weight /= total_visits
+
+            avg_beliefs += weight * value
+
+        return avg_beliefs
+            
 
 
 

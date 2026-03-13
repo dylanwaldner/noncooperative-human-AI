@@ -221,8 +221,14 @@ class AwareHumanPTAgent:
         #    ])
         #
         # We take the pt transformation just like with LH
-        elif self.ref_update_mode == 'Q':
-            payoffs = self.payoff_matrix[:,:,self.agent_id].flatten()
+        elif self.ref_update_mode == 'V':
+            opp_br = self.get_opp_br(self.payoff_matrix)
+            if self.agent_id == 0:
+                payoffs = self.payoff_matrix[:,opp_br,0]
+
+            else:
+                payoffs = self.payoff_matrix[opp_br, :, 1]
+            
             values = np.array([self.pt.value_function(po) for po in payoffs])
             self.ref_point = values.max()
 

@@ -231,9 +231,16 @@ class LearningHumanPTAgent:
                 # we defined as pt warped and not in outcome space
                 weighted_q_val = self.pt.expected_pt_value(self.q_values[state][action], self.beliefs[state])
                 weighted_q_vals[action] = weighted_q_val
-            max_q_val = weighted_q_vals.max()
+
+            # Since our policy is just epsilon greedy, we weigh the q vals wrt the policy
+            # To get a V(s)
+            greedy_action = np.argmax(weighted_q_vals)
+            policy = np.ones(self.action_size) * (self.epsilon / self.action_size) 
+            policy[greedy_action] += 1.0 - self.epsilon
+
+            V_val = policy.dot(weighted_q_vals)
             
-            self.ref_point = max_q_val
+            self.ref_point = V_val
 
         elif self.ref_update_mode == 'EMAOR':
             # EMA, but now using the opponents rewards 

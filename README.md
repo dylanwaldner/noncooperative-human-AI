@@ -1,7 +1,9 @@
 
 # RL Nash with AIs (EUT) and Humans (CPT)
 
-# Primary Author: Dylan Waldner, Contributor: Mitchelle Ashimosi, Supervised by Vyacheslav Kungurtsev
+## Primary Author: Dylan Waldner
+## Contributor: Mitchelle Ashimosi
+## Supervised by Vyacheslav Kungurtsev
 
 ## Running the experiments:
 

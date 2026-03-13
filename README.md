@@ -7,9 +7,10 @@
 
 ## Running the experiments:
 
+<!--
 ### Run static games with python3 main_static.py
-
-### Run repeated games with python3 main_repeated.py
+-->
+### Run repeated games with python3 main\_repeated.py
 
 #### Expect a series of prompts to customize the set up of the experiment, e.g. num episodes, game selection, agent selection, etc. 
 
@@ -44,7 +45,7 @@ Prospect Theory: **prospect_theory.py** implements cumulative prospect theory by
 Importantly, note that the value function uses the internal representation of the reference point to calculate the value internally, so its important to be 100% sure that each PT agent in train.py is updating their reference point in place in their instance of ProspectTheory(). 
 
 **utils.py** stores the payoff matrices and a smoothing function for plotting. 
-
+<!--
 ### static_games/
 
 #### Solvers
@@ -68,3 +69,5 @@ The semismooth method makes some important deviations from EB while retaining it
 - Jacobian is now full because F depends on P and Q
 - Finite difference still used
        **fp_ptne_solver.py** implements a fixed point iteration (gauss seidel). Here, the pure and mixed equilibria search is collapsed into 1, we do a grid search for values and immediate update p when a new max is found, and at the end of each iteration check if p, q are the same as before. If so, we return it as a mixed equilibria. 
+
+-->

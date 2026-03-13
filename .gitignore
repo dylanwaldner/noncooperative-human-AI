@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 deprecated/
 static_games/
+main_static.py

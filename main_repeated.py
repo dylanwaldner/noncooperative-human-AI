@@ -374,11 +374,11 @@ def interactive_experiment():
             analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params)
 
         elif choice == '4':
-            games_list = list(games.keys())[2:]
+            games_list = list(games.keys())
             for game_name in games_list:
                 state_histories = [0, 2]
                 for state_history in state_histories:
-                    ref_settings = ["EMA", "Q", "EMAOR"]
+                    ref_settings = ["Fixed", "EMA", "V", "EMAOR"]
                     for ref_setting in ref_settings:
                         payoff_matrix = games[game_name]['payoffs']
 

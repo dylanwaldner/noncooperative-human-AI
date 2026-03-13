@@ -219,9 +219,9 @@ class LearningHumanPTAgent:
         if self.ref_update_mode == "EMA":
             self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * payoff
 
-        # This is where we select the max Q val for our reference point (very greedy human)
+        # This is where we select the V val for our reference point (very greedy human)
         # We talked about this in meeting a couple of times, please let me know if it holds
-        elif self.ref_update_mode == 'Q':
+        elif self.ref_update_mode == 'V':
             # Set reference point to maximum, normalized q value
             weighted_q_vals = np.zeros(self.action_size)
             for action in range(self.action_size):

@@ -33,7 +33,10 @@ class AIAgent:
         self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.alpha = 0.01
+
+        self.alpha = 0.1
+        self.init_alpha = self.alpha
+        self.k = 0.6
 
         # tiebreaker variables
         self.tau = 0.1 # threshold
@@ -74,6 +77,9 @@ class AIAgent:
         else:
             return optimal_action
  
+    def update_alpha(self, state, action):
+        step = self.state_visit_counter[state][action]
+        self.alpha = self.init_alpha / step ** self.k
 
     def update(self, state, action, next_state, reward=None, done=False):
         ''' Just vanilla q learning here, no PT and nothing fancy like with the beliefs. 
@@ -82,9 +88,11 @@ class AIAgent:
         
         # Update state count
         if state not in self.state_visit_counter.keys():
-            self.state_visit_counter[state] = 0
+            self.state_visit_counter[state] = [0] * self.action_size
 
-        self.state_visit_counter[state] += 1
+        self.state_visit_counter[state][action] += 1
+
+        self.update_alpha(state, action)
 
         # Get the present state value
         curr_q_val = self.q_values[state][action]
@@ -107,13 +115,13 @@ class AIAgent:
     def get_q_values(self):
         q_values = np.zeros((self.action_size, self.opp_action_size))
 
-        total_visits = sum(self.state_visit_counter.values())
+        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
 
         if total_visits == 0:
             return q_values
 
         for state, q_val in self.q_values.items():
-            num_visits = self.state_visit_counter.get(state, 0)
+            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
 
             if num_visits == 0:
                 continue

@@ -66,7 +66,10 @@ class LearningHumanPTAgent:
         self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.alpha = 0.01 # standard alpha value from what I can tell
+
+        self.alpha = 0.1 # standard init alpha value from what I can tell
+        self.init_alpha = self.alpha
+        self.k = 0.6
 
         # Pathology Detection parameters
         self.tau = 0.1 # Threshold parameter
@@ -213,6 +216,10 @@ class LearningHumanPTAgent:
         one_hot[opp_action] = 1
         self.beliefs[state] = self.lam_b * self.beliefs[state] + (1 - self.lam_b) * one_hot
 
+    def alpha_update(self, state, action):
+        step = self.state_visit_counter[state][action]
+        self.alpha = self.init_alpha / step ** self.k 
+
     def ref_update(self, payoff, state, opp_payoff):
         # Just slowly moving in the new direction instead of all at once, this seems sufficient for our pruposes
         # alternatively we could do some kind of bayesian update, but that feels like overkill to me
@@ -257,9 +264,11 @@ class LearningHumanPTAgent:
         in the boot strap. 
         '''
         if state not in self.state_visit_counter.keys():
-            self.state_visit_counter[state] = 0
+            self.state_visit_counter[state] = [0] * self.action_size
 
-        self.state_visit_counter[state] += 1
+        self.state_visit_counter[state][action] += 1
+
+        self.alpha_update(state, action)
 
         ## get next state for q vals and beliefs
         q_values = self.get_q_values()
@@ -303,13 +312,13 @@ class LearningHumanPTAgent:
     def get_q_values(self):
         q_values = np.zeros((self.action_size, self.opp_action_size))
 
-        total_visits = sum(self.state_visit_counter.values())
+        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
 
         if total_visits == 0:
             return q_values
 
         for state, q_vals in self.q_values.items():
-            num_visits = self.state_visit_counter.get(state, 0)
+            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
 
             if num_visits == 0:
                 continue
@@ -323,15 +332,15 @@ class LearningHumanPTAgent:
     def get_avg_beliefs(self):
         avg_beliefs = np.zeros(self.opp_action_size)
 
-        total_visits = sum(self.state_visit_counter.values())
+        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
   
         if total_visits == 0:
             return avg_beliefs
 
 
         for state, value in self.beliefs.items():
-            weight = self.state_visit_counter[state]
-            weight /= total_visits
+            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
+            weight = num_visits / total_visits
 
             avg_beliefs += weight * value
 

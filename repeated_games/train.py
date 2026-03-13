@@ -374,11 +374,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
         # Store results
         matchup_key = f"{agent1_type}_vs_{agent2_type}"
-        all_results[matchup_key] = {
-            'results': results,
-            'agent1': agent1,
-            'agent2': agent2
-        }
+        all_results[matchup_key] = results
 
         # Analyze this matchup
         games_dict = get_all_games()

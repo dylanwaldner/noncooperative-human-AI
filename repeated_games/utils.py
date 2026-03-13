@@ -65,3 +65,17 @@ def get_all_games():
 def smooth(y, window):
     kernel = np.ones(window, dtype=float) / window
     return np.convolve(y, kernel, mode='valid')
+
+def convert(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert(i) for i in obj]
+    return obj
+

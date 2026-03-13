@@ -4,11 +4,13 @@ import pandas as pd
 import time
 from collections import Counter
 from matplotlib.ticker import FuncFormatter
-from .utils import smooth
+from .utils import smooth, convert
 import os
 from pathlib import Path
 
-DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments2"
+import json
+
+DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
 
 def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_type, env):
     """
@@ -345,6 +347,7 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     plt.suptitle(f'{game_name}: {agent1_type} vs {agent2_type}', fontsize=16, y=1.02)
     plt.tight_layout()
     plt.savefig(path / f"{ref_type}.png")
+
     #plt.show()
 
 def compare_all_results(all_results, game_name, state_history, num_experiments, ref_type):
@@ -369,12 +372,10 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     last_n = 50
 
     for matchup_key, data in all_results.items():
-        runs = data["results"]
-
         run_means1 = []
         run_means2 = []
 
-        for run_id, run_results in runs.items():
+        for run_id, run_results in data.items():
 
             rewards1 = np.asarray(run_results.get("avg_rewards1", []), dtype=float)
             rewards2 = np.asarray(run_results.get("avg_rewards2", []), dtype=float)
@@ -476,8 +477,6 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     policy_rows = []
 
     for matchup_key, data in all_results.items():
-        runs = data["results"]
-
         run_probs = {
             "P1_A0": [],
             "P1_A1": [],
@@ -485,7 +484,7 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
             "P2_A1": [],
         }
 
-        for run_id, exp in runs.items():
+        for run_id, exp in data.items():
             actions_1 = exp["actions1"]
             actions_2 = exp["actions2"]
 
@@ -576,12 +575,10 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     action_change_rows = []
 
     for matchup_key, data in all_results.items():
-        runs = data["results"]
-
         run_rates_1 = []
         run_rates_2 = []
 
-        for run_id, exp in runs.items():
+        for run_id, exp in data.items():
             flags_1 = np.asarray(exp.get("action_changed_flags1", []), dtype=float)
             flags_2 = np.asarray(exp.get("action_changed_flags2", []), dtype=float)
 
@@ -674,12 +671,10 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     l2_rows = []
 
     for matchup_key, data in all_results.items():
-        runs = data["results"]
-
         run_l2_1 = []
         run_l2_2 = []
 
-        for run_id, exp in runs.items():
+        for run_id, exp in data.items():
             dists_1 = np.asarray(exp.get("pt_l2_dists1", []), dtype=float)
             dists_2 = np.asarray(exp.get("pt_l2_dists2", []), dtype=float)
 
@@ -751,12 +746,10 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ref_rows = []
 
     for matchup_key, data in all_results.items():
-        runs = data["results"]
-
         run_final_refs_1 = []
         run_final_refs_2 = []
 
-        for run_id, exp in runs.items():
+        for run_id, exp in data.items():
             refs_1 = np.asarray(exp.get("ref_points1", []), dtype=float)
             refs_2 = np.asarray(exp.get("ref_points2", []), dtype=float)
 
@@ -857,4 +850,11 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
 
     plt.savefig(path / f"{game_name}_{ref_type}_Comparison.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
+
+    all_results = convert(all_results)
+   
+
+    with open(path / f"{game_name}_{ref_type}_Comparison.json", "w") as f:
+        json.dump(all_results, f)
+
     return comparison_data

@@ -382,6 +382,12 @@ def interactive_experiment():
                     for ref_setting in ref_settings:
                         payoff_matrix = games[game_name]['payoffs']
 
+                        if ref_setting == "Fixed":
+                            ref_point1 = (payoff_matrix[:, :, 0].max() + payoff_matrix[:, :, 0].min()) / 2
+                            ref_point2 = (payoff_matrix[:, :, 1].max() + payoff_matrix[:, :, 1].min()) / 2
+
+                            r = [ref_point1, ref_point2]
+
                         print(f"\nStarting complete experiment for {game_name}...")
                         all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments)
 

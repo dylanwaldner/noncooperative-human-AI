@@ -344,6 +344,39 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     ax8.legend()
     ax8.grid(True, alpha=0.3)
 
+    ax9 = plt.subplot(3, 3, 9)
+
+    smoothed_gap1 = []
+    smoothed_gap2 = []
+
+    for idx in range(len(results.keys())):
+        gap1 = np.array(results[f"{idx}"]['best_rewards1']) - np.array(results[f"{idx}"]['raw_rewards1'])
+        gap2 = np.array(results[f"{idx}"]['best_rewards2']) - np.array(results[f"{idx}"]['raw_rewards2'])
+        
+        smoothed_gap1.append(np.convolve(gap1, np.ones(window)/window, mode='valid'))
+        smoothed_gap2.append(np.convolve(gap2, np.ones(window)/window, mode='valid'))
+
+    smoothed_gap1 = np.stack(smoothed_gap1)
+    smoothed_gap2 = np.stack(smoothed_gap2)
+
+    mean_gap1, mean_gap2 = np.mean(smoothed_gap1, axis=0), np.mean(smoothed_gap2, axis=0)
+    se_gap1 = np.std(smoothed_gap1, axis=0) / np.sqrt(num_experiments)
+    se_gap2 = np.std(smoothed_gap2, axis=0) / np.sqrt(num_experiments)
+
+    x = np.arange(len(mean_gap1))
+
+    ax9.plot(mean_gap1, label=f'{agent1_type} exploitability', linewidth=2)
+    ax9.plot(mean_gap2, label=f'{agent2_type} exploitability', linewidth=2)
+    ax9.fill_between(x, mean_gap1 + 1.96*se_gap1, mean_gap1 - 1.96*se_gap1, alpha=0.3)
+    ax9.fill_between(x, mean_gap2 + 1.96*se_gap2, mean_gap2 - 1.96*se_gap2, alpha=0.3)
+    ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+
+    ax9.set_xlabel('Step')
+    ax9.set_ylabel('Best Response Reward - Actual Reward')
+    ax9.set_title(f'Exploitability Gap Over {num_experiments} Runs\n{agent1_type} vs {agent2_type}')
+    ax9.legend()
+    ax9.grid(True, alpha=0.3)
+
     plt.suptitle(f'{game_name}: {agent1_type} vs {agent2_type}', fontsize=16, y=1.02)
     plt.tight_layout()
     plt.savefig(path / f"{ref_type}.png")

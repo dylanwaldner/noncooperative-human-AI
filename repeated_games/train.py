@@ -33,6 +33,8 @@ def train_agents(agent1, agent2, env, episodes=500,
     results = {
         'rewards1': [],
         'rewards2': [],
+        'raw_rewards1', [],
+        'raw_rewards2', [],
         'actions1': [],
         'actions2': [],
         'avg_rewards1': [],
@@ -43,6 +45,10 @@ def train_agents(agent1, agent2, env, episodes=500,
         'q_values2':[],
         'ref_points1': [],
         'ref_points2': [],
+        'best_responses1': [],
+        'best_responses2': [],
+        'best_rewards1': [], 
+        'best_rewards2': []
     }
     joint_counts = np.zeros((agent1.action_size,agent2.action_size), dtype=int)
 
@@ -68,14 +74,21 @@ def train_agents(agent1, agent2, env, episodes=500,
 
     for episode in range(episodes):
         state = env.reset()
-        episode_rewards1 = 0
-        episode_rewards2 = 0
+        episode_rewards1 = []
+        episode_rewards2 = []
         episode_actions1 = []
         episode_actions2 = []
         episode_q_values1 = []
         episode_q_values2 = []
-        episode_br1 = []
-        episode_br2 = []
+        
+        # Tracks the real best response that agents could have played wrt raw payoffs
+        best_response1 = []
+        best_response2 = []
+
+        # Now we track how the best responder would be rewarded
+        # 1 is br1(a2) rewards (so what would rewards look like if agent1 made the br to agent2) and vice versa
+        best_reward1 = []
+        best_reward2 = []
 
         for _ in range(env.horizon):
             # We transform the PT agents states to include ref bins
@@ -214,11 +227,29 @@ def train_agents(agent1, agent2, env, episodes=500,
             global_step += 1
  
             # Store results
-            episode_rewards1 += reward1
-            episode_rewards2 += reward2
+            episode_rewards1.append(reward1)
+            episode_rewards2.append(reward2)
 
             episode_actions1.append(action1)
             episode_actions2.append(action2)
+
+            # We calculate agent 1's best response given agent 2's actual action, and vice versa
+            agent1_a1, agent1_a2 = payoff_matrix[0, action2, 0], payoff_matrix[1, action2, 0]
+            agent2_a1, agent2_a2 = payoff_matrix[action1, 0, 1], payoff_matrix[action1, 1, 1]
+
+            if agent1_a1 > agent1_a2:
+                best_response1.append(0)
+                best_reward1.append(agent1_a1)
+            else:
+                best_response1.append(1)
+                best_reward1.append(agent1_a2)
+
+            if agent2_a1 > agent2_a2:
+                best_response2.append(0)
+                best_reward2.append(agent2_a1)
+            else:
+                best_response2.append(1) 
+                best_reward2.append(agent2_a2)
 
             # For action heat map
             joint_counts[action1, action2] += 1
@@ -232,17 +263,27 @@ def train_agents(agent1, agent2, env, episodes=500,
         # Store episode results
         print(f"\rEpisode {episode} of {episodes}", end='')
         steps = env.horizon
-        avg_reward1 = episode_rewards1 / steps
-        avg_reward2 = episode_rewards2 / steps
+        avg_reward1 = sum(episode_rewards1) / steps
+        avg_reward2 = sum(episode_rewards2) / steps
 
-        results['rewards1'].append(episode_rewards1)
-        results['rewards2'].append(episode_rewards2)
+        results['rewards1'].append(sum(episode_rewards1))
+        results['rewards2'].append(sum(episode_rewards2))
+
+        results['raw_rewards1'].append(episode_rewards1)
+        results['raw_rewards2'].append(episode_rewards2)
 
         results['actions1'].append(episode_actions1)
         results['actions2'].append(episode_actions2)
 
         results['avg_rewards1'].append(avg_reward1)
         results['avg_rewards2'].append(avg_reward2)
+
+        results['best_responses1'].append(best_response1)
+        results['best_responses2'].append(best_response2)
+
+        results['best_rewards1'].append(best_reward1)
+        results['best_rewards2'].append(best_reward2)
+
         
         # Decay exploration
         if isinstance(agent1, (LearningHumanPTAgent, AIAgent)):
@@ -381,7 +422,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
             opp_params['opponent_action_size'] = action_size
             opp_params['opp_ref'] = None
 
-            if agent1_type != "AI": # PT agent
+            if agent2_type != "AI": # PT agent
                 opp_params['opp_ref'] = ref_point2
                 opp_params['opp_pt'] = pt_params2
 

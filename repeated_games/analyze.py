@@ -350,8 +350,8 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     smoothed_gap2 = []
 
     for idx in range(len(results.keys())):
-        gap1 = np.array(results[f"{idx}"]['best_rewards1']) - np.array(results[f"{idx}"]['raw_rewards1'])
-        gap2 = np.array(results[f"{idx}"]['best_rewards2']) - np.array(results[f"{idx}"]['raw_rewards2'])
+        gap1 = np.array(results[f"{idx}"]['best_rewards1']).flatten() - np.array(results[f"{idx}"]['raw_rewards1']).flatten()
+        gap2 = np.array(results[f"{idx}"]['best_rewards2']).flatten() - np.array(results[f"{idx}"]['raw_rewards2']).flatten()
         
         smoothed_gap1.append(np.convolve(gap1, np.ones(window)/window, mode='valid'))
         smoothed_gap2.append(np.convolve(gap2, np.ones(window)/window, mode='valid'))

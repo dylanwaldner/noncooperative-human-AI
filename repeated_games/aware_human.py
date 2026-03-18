@@ -31,6 +31,7 @@ class AwareHumanPTAgent:
 
         self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
 
+        self.tit_for_tat = tit_for_tat
 
         self.ref_point = pt_params['r']
         self.tau = 0.1 # tie break threshold
@@ -62,6 +63,30 @@ class AwareHumanPTAgent:
 
         self.pt_l2_dists = []
         self.action_changed_flags = []
+
+    def transform_state(self, state):
+        # Transform the states from the s(H) to s(H)B format
+        # First, normalize for simplicity
+        low = min(self.min_payoff, self.ref_point)
+        high = max(self.max_payoff, self.ref_point)
+
+        self.min_payoff, self.max_payoff = low, high
+
+        denom = high - low
+        if denom == 0:
+            norm_ref_point = 0
+        else:
+            norm_ref_point = (self.ref_point - low) / denom
+
+        ref_bin = None
+
+        ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
+
+        if ref_bin is None:
+            raise TypeError("Ref bin never updated")
+
+        pt_state = state * self.B + ref_bin
+        return pt_state
 
     def get_opp_br(self, matrix):
         '''

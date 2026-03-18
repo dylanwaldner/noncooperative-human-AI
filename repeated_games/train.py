@@ -33,8 +33,8 @@ def train_agents(agent1, agent2, env, episodes=500,
     results = {
         'rewards1': [],
         'rewards2': [],
-        'raw_rewards1', [],
-        'raw_rewards2', [],
+        'raw_rewards1': [],
+        'raw_rewards2': [],
         'actions1': [],
         'actions2': [],
         'avg_rewards1': [],
@@ -97,6 +97,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                     pt_state1 = agent1.transform_state(state)
                     action1 = agent1.act(pt_state1)
                 else:
+                    pt_state1 = agent1.transform_state(state)
                     action1 = agent1.act(last_action2)
 
             else:
@@ -109,6 +110,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                     pt_state2 = agent2.transform_state(state)
                     action2 = agent2.act(pt_state2)
                 else:
+                    pt_state2 = agent2.transform_state(state)
                     action2 = agent2.act(last_action1)
 
             else:
@@ -384,6 +386,9 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
     all_results = {}
 
     for agent1_type, agent2_type in matchups:
+        if state_history == 0:
+            if agent1_type == "AH2" or agent2_type == "AH2":
+                continue
         print(f"\n{'='*70}")
         print(f"MATCHUP: {agent1_type} vs {agent2_type}")
         print('='*70)

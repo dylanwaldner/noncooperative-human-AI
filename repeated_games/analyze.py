@@ -264,12 +264,9 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     ax6.grid(True, alpha=0.3)
 
     ax7 = plt.subplot(3, 3, 7)
-    ax8 = plt.subplot(3, 3, 8)
 
     num_experiments = len(results.keys())
 
-    # First pass: collect per-experiment action prob curves
-    # Structure: {action_str: [exp0_curve, exp1_curve, ...]} for each player
     all_plot_1 = {}
     all_plot_2 = {}
 
@@ -299,7 +296,6 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
                     plot_2[str(action)] = [0] * (idx + 1)
                 plot_2[str(action)][idx] = prob
 
-        # Accumulate into all_plot dicts
         for action, curve in plot_1.items():
             if action not in all_plot_1:
                 all_plot_1[action] = []
@@ -310,40 +306,34 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
                 all_plot_2[action] = []
             all_plot_2[action].append(curve)
 
-    # Second pass: ensemble and plot
     first_exp = results["0"]
     num_episodes = len(first_exp['actions1'])
     window = num_episodes // 20
     x_labels = range(window - 1, num_episodes)
 
-    for action, curves in all_plot_1.items():
+    if '0' in all_plot_1:
+        curves = all_plot_1['0']
         smoothed = np.array([smooth(c, window) for c in curves])
         mean_curve = smoothed.mean(axis=0)
-        std_curve = smoothed.std(axis=0)
-        se = std_curve / np.sqrt(num_experiments)
-        ax7.plot(x_labels, mean_curve, label=f'Action: {action}')
+        se = smoothed.std(axis=0) / np.sqrt(num_experiments)
+        ax7.plot(x_labels, mean_curve, label=f'{agent1_type} Action 0')
         ax7.fill_between(x_labels, mean_curve - 1.96 * se, mean_curve + 1.96 * se, alpha=0.3)
 
-    for action, curves in all_plot_2.items():
+    if '0' in all_plot_2:
+        curves = all_plot_2['0']
         smoothed = np.array([smooth(c, window) for c in curves])
         mean_curve = smoothed.mean(axis=0)
-        std_curve = smoothed.std(axis=0)
-        se = std_curve / np.sqrt(num_experiments)
-        ax8.plot(x_labels, mean_curve, label=f'Action: {action}')
-        ax8.fill_between(x_labels, mean_curve - 1.96 * se, mean_curve + 1.96 * se, alpha=0.3)
+        se = smoothed.std(axis=0) / np.sqrt(num_experiments)
+        ax7.plot(x_labels, mean_curve, label=f'{agent2_type} Action 0')
+        ax7.fill_between(x_labels, mean_curve - 1.96 * se, mean_curve + 1.96 * se, alpha=0.3)
 
-    ax7.set_title("Player 1 Policies (Action Probs) Over Time")
+    ax7.set_title(f"Action 0 Policy Over Time\n{agent1_type} vs {agent2_type}")
     ax7.set_xlabel("Episodes")
-    ax7.set_ylabel("Action Probabilities")
+    ax7.set_ylabel("Action 0 Probability")
     ax7.legend()
     ax7.grid(True, alpha=0.3)
 
-    ax8.set_title("Player 2 Policies (Action Probs) Over Time")
-    ax8.set_xlabel("Episodes")
-    ax8.set_ylabel("Action Probabilities")
-    ax8.legend()
-    ax8.grid(True, alpha=0.3)
-
+    ax8 = plt.subplot(3, 3, 8)
     ax9 = plt.subplot(3, 3, 9)
 
     smoothed_gap1 = []
@@ -352,7 +342,7 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
     for idx in range(len(results.keys())):
         gap1 = np.array(results[f"{idx}"]['best_rewards1']).flatten() - np.array(results[f"{idx}"]['raw_rewards1']).flatten()
         gap2 = np.array(results[f"{idx}"]['best_rewards2']).flatten() - np.array(results[f"{idx}"]['raw_rewards2']).flatten()
-        
+
         smoothed_gap1.append(np.convolve(gap1, np.ones(window)/window, mode='valid'))
         smoothed_gap2.append(np.convolve(gap2, np.ones(window)/window, mode='valid'))
 
@@ -365,15 +355,21 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
 
     x = np.arange(len(mean_gap1))
 
-    ax9.plot(mean_gap1, label=f'{agent1_type} exploitability', linewidth=2)
-    ax9.plot(mean_gap2, label=f'{agent2_type} exploitability', linewidth=2)
-    ax9.fill_between(x, mean_gap1 + 1.96*se_gap1, mean_gap1 - 1.96*se_gap1, alpha=0.3)
+    ax8.plot(mean_gap1, label=f'{agent1_type}', linewidth=2)
+    ax8.fill_between(x, mean_gap1 + 1.96*se_gap1, mean_gap1 - 1.96*se_gap1, alpha=0.3)
+    ax8.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax8.set_xlabel('Step')
+    ax8.set_ylabel('Best Response Reward - Actual Reward')
+    ax8.set_title(f'{agent1_type} Exploitability Gap\n{num_experiments} Runs')
+    ax8.legend()
+    ax8.grid(True, alpha=0.3)
+
+    ax9.plot(mean_gap2, label=f'{agent2_type}', linewidth=2)
     ax9.fill_between(x, mean_gap2 + 1.96*se_gap2, mean_gap2 - 1.96*se_gap2, alpha=0.3)
     ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-
     ax9.set_xlabel('Step')
     ax9.set_ylabel('Best Response Reward - Actual Reward')
-    ax9.set_title(f'Exploitability Gap Over {num_experiments} Runs\n{agent1_type} vs {agent2_type}')
+    ax9.set_title(f'{agent2_type} Exploitability Gap\n{num_experiments} Runs')
     ax9.legend()
     ax9.grid(True, alpha=0.3)
 
@@ -868,7 +864,58 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ax5.legend()
     ax5.grid(True, alpha=0.3, axis="y")
 
-    ax6.axis("off")
+    exploit_data = []
+
+    for matchup_key, data in all_results.items():
+        run_gaps1 = []
+        run_gaps2 = []
+
+        for run_id, run_results in data.items():
+            best1 = np.asarray(run_results.get("best_rewards1", []), dtype=float).flatten()
+            raw1 = np.asarray(run_results.get("raw_rewards1", []), dtype=float).flatten()
+            best2 = np.asarray(run_results.get("best_rewards2", []), dtype=float).flatten()
+            raw2 = np.asarray(run_results.get("raw_rewards2", []), dtype=float).flatten()
+
+            if len(best1) < last_n or len(best2) < last_n:
+                continue
+
+            run_gaps1.append(np.mean((best1 - raw1)[-last_n:]))
+            run_gaps2.append(np.mean((best2 - raw2)[-last_n:]))
+
+        if not run_gaps1 or not run_gaps2:
+            continue
+
+        run_gaps1 = np.asarray(run_gaps1)
+        run_gaps2 = np.asarray(run_gaps2)
+
+        ci1 = 1.96 * run_gaps1.std(ddof=1) / np.sqrt(len(run_gaps1)) if len(run_gaps1) > 1 else 0.0
+        ci2 = 1.96 * run_gaps2.std(ddof=1) / np.sqrt(len(run_gaps2)) if len(run_gaps2) > 1 else 0.0
+
+        exploit_data.append({
+            "Matchup": matchup_key,
+            "Agent1_Gap": run_gaps1.mean(),
+            "Agent1_CI": ci1,
+            "Agent2_Gap": run_gaps2.mean(),
+            "Agent2_CI": ci2,
+        })
+
+    exploit_df = pd.DataFrame(exploit_data)
+    exploit_df = exploit_df.set_index("Matchup").loc[df["Matchup"]].reset_index()
+
+    x = np.arange(len(exploit_df["Matchup"]))
+
+    ax6.bar(x - width/2, exploit_df["Agent1_Gap"], width, yerr=exploit_df["Agent1_CI"],
+            label="Agent 1", alpha=0.7, capsize=4)
+    ax6.bar(x + width/2, exploit_df["Agent2_Gap"], width, yerr=exploit_df["Agent2_CI"],
+            label="Agent 2", alpha=0.7, capsize=4)
+    ax6.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax6.set_xlabel("Matchup")
+    ax6.set_ylabel("Best Response Reward - Actual Reward")
+    ax6.set_title("Exploitability Gap by Matchup")
+    ax6.set_xticks(x)
+    ax6.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
+    ax6.legend()
+    ax6.grid(True, alpha=0.3, axis="y")
 
     fig.suptitle(f"{game_name} — Learning Results Across Matchups - Last {last_n} Episodes", fontsize=16)
 

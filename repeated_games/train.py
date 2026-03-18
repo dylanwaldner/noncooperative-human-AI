@@ -64,6 +64,7 @@ def train_agents(agent1, agent2, env, episodes=500,
     else:
         payoff_matrix = env.payoff_matrix
 
+    last_action1, last_action2 = 0, 0
 
     for episode in range(episodes):
         state = env.reset()
@@ -79,8 +80,11 @@ def train_agents(agent1, agent2, env, episodes=500,
         for _ in range(env.horizon):
             # We transform the PT agents states to include ref bins
             if not isinstance(agent1, AIAgent):
-                pt_state1 = agent1.transform_state(state)
-                action1 = agent1.act(pt_state1)
+                if isinstance(agent1, LearningHumanPTAgent):
+                    pt_state1 = agent1.transform_state(state)
+                    action1 = agent1.act(pt_state1)
+                else:
+                    action1 = agent1.act(last_action2)
 
             else:
                 pt_state1 = None
@@ -88,13 +92,18 @@ def train_agents(agent1, agent2, env, episodes=500,
                 action1 = agent1.act(state)
 
             if not isinstance(agent2, AIAgent):
-                pt_state2 = agent2.transform_state(state)
-                action2 = agent2.act(pt_state2)
+                if isinstance(agent2, LearningHumanPTAgent):
+                    pt_state2 = agent2.transform_state(state)
+                    action2 = agent2.act(pt_state2)
+                else:
+                    action2 = agent2.act(last_action1)
 
             else:
                 pt_state2 = None
                 # Agent 1 chooses action
                 action2 = agent2.act(state)
+
+            last_action1, last_action2 = action1, action2
 
             # Execute step
             next_state, reward1, reward2, done, _ = env.step(action1, action2)
@@ -297,28 +306,36 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
     # Define all matchups to test
     if game_name in ["PrisonersDilemma","StagHunt", "Chicken"]:
         matchups = [
-        ('AH', 'AI'),
+        ('AH1', 'AI'),
+        ('AH2', 'AI'),
 
         ('LH', 'AI'),
 
-        ('AH', 'LH'),
+        ('AH1', 'LH'),
+        ('AH2', 'LH'),
+        ('AH1', 'AH1'), # Baseline
+        ('AH2', 'AH2'),
 
-        ('AH', 'AH'), # Baseline
         ('LH', 'LH'),
         ('AI', 'AI')  
         ]
     else:
         matchups = [
-        ('AH', 'AI'),
-        ('AI', 'AH'),
+        ('AH1', 'AI'),
+        ('AI', 'AH1'),
+        ('AH2', 'AI'),
+        ('AI', 'AH2'),
 
         ('LH', 'AI'),
         ('AI', 'LH'),
 
-        ('AH', 'LH'),
-        ('LH', 'AH'),
+        ('AH1', 'LH'),
+        ('LH', 'AH1'),
+        ('AH2', 'LH'),
+        ('LH', 'AH2'),
 
-        ('AH', 'AH'), # Baseline
+        ('AH1', 'AH1'), # Baseline
+        ('AH2', 'AH2'), # Baseline
         ('LH', 'LH'),
         ('AI', 'AI')  
         ]   
@@ -346,7 +363,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         elif agent2_type == 'AI':  # AI
             agent2 = AIAgent(env.state_size, action_size, action_size, agent_id=1)
 
-        if agent1_type == 'AH':
+        if agent1_type == 'AH1':
             opp_params = dict()
             opp_params['opponent_type'] = agent2_type
             opp_params['opponent_action_size'] = action_size
@@ -358,7 +375,19 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
             agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=0, opp_params=opp_params,ref_setting=ref_setting, lambda_ref=ref_lambda)
 
-        if agent2_type == 'AH':
+        if agent1_type == 'AH2':
+            opp_params = dict()
+            opp_params['opponent_type'] = agent2_type
+            opp_params['opponent_action_size'] = action_size
+            opp_params['opp_ref'] = None
+
+            if agent1_type != "AI": # PT agent
+                opp_params['opp_ref'] = ref_point2
+                opp_params['opp_pt'] = pt_params2
+
+            agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda, tit_for_tat=True)
+
+        if agent2_type == 'AH1':
             opp_params = dict()
             opp_params['opponent_type'] = agent1_type
             opp_params['opponent_action_size'] = action_size
@@ -369,6 +398,18 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                 opp_params['opp_pt'] = pt_params1
 
             agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda)
+
+        if agent2_type == 'AH2':
+            opp_params = dict()
+            opp_params['opponent_type'] = agent1_type
+            opp_params['opponent_action_size'] = action_size
+            opp_params['opp_ref'] = None
+
+            if agent1_type != "AI": # PT agent
+                opp_params['opp_ref'] = ref_point1
+                opp_params['opp_pt'] = pt_params1
+
+            agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda, tit_for_tat=True)
 
 
         # Train the matchup

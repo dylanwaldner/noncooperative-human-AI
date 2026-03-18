@@ -14,7 +14,7 @@ class AwareHumanPTAgent:
     Compared to learning human, no beliefs and no RL, just a best reply agent. 
     """
 
-    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', lambda_ref=0.95, B=5):
+    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', lambda_ref=0.95, B=5, tit_for_tat=False):
         self.payoff_matrix = payoff_matrix
         self.pt = ProspectTheory(**pt_params)
 
@@ -62,30 +62,6 @@ class AwareHumanPTAgent:
 
         self.pt_l2_dists = []
         self.action_changed_flags = []
-
-    def transform_state(self, state):
-        # Transform the states from the s(H) to s(H)B format
-        # First, normalize for simplicity
-        low = min(self.min_payoff, self.ref_point)
-        high = max(self.max_payoff, self.ref_point)
-
-        self.min_payoff, self.max_payoff = low, high
-
-        denom = high - low
-        if denom == 0:
-            norm_ref_point = 0
-        else:
-            norm_ref_point = (self.ref_point - low) / denom
-
-        ref_bin = None
-
-        ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
-
-        if ref_bin is None:
-            raise TypeError("Ref bin never updated")
-
-        pt_state = state * self.B + ref_bin
-        return pt_state
 
     def get_opp_br(self, matrix):
         '''
@@ -189,22 +165,26 @@ class AwareHumanPTAgent:
 
         return best_response
 
-    def act(self, state=None):
-        self.global_steps += 1
-        self.lam_ref_update()
+    def act(self, last_opp_action=None):
+        if not self.tit_for_tat:
+            self.global_steps += 1
+            self.lam_ref_update()
 
-        matrix = self.payoff_matrix
-        # Make robust to col/row designation
-        if self.agent_id == 1:
-            matrix = matrix.transpose(1, 0, 2)
+            matrix = self.payoff_matrix
+            # Make robust to col/row designation
+            if self.agent_id == 1:
+                matrix = matrix.transpose(1, 0, 2)
 
 
-        # First we need to get the opp best responses to our actions 
-        opp_best_responses = self.get_opp_br(matrix)
+            # First we need to get the opp best responses to our actions 
+            opp_best_responses = self.get_opp_br(matrix)
 
-        # Now the decision matrix has gone from 2x2 -> 2x1. We plug in each opp response and 
-        # argmax the best action we can take conditioned on how the opponent will reply
-        player_best_response = self.get_best_response(matrix, opp_best_responses)
+            # Now the decision matrix has gone from 2x2 -> 2x1. We plug in each opp response and 
+            # argmax the best action we can take conditioned on how the opponent will reply
+            player_best_response = self.get_best_response(matrix, opp_best_responses)
+
+        else:
+            player_best_response = last_opp_action
 
         return player_best_response
 

@@ -38,7 +38,11 @@ class LearningHumanPTAgent:
 
         # Initialize belief and reference point lambda parameters. 0.95 is a standard setting, carries across episodes
         self.lam_b = 0.95
-        self.lam_r = lambda_ref
+
+
+        self.init_lam_ref = lambda_ref
+        self.lam_r = self.init_lam_ref
+        self.ref_k = 0.6
 
         # Set reference point update mode:
         # options: Fixed, EMA, Max Q value (conditioned on beliefs over opp actions), 
@@ -69,7 +73,7 @@ class LearningHumanPTAgent:
 
         self.alpha = 0.1 # standard init alpha value from what I can tell
         self.init_alpha = self.alpha
-        self.k = 0.6
+        self.k = 0.7
 
         # Pathology Detection parameters
         self.tau = 0.1 # Threshold parameter
@@ -220,6 +224,10 @@ class LearningHumanPTAgent:
         step = self.state_visit_counter[state][action]
         self.alpha = self.init_alpha / step ** self.k 
 
+    def lambda_ref_update(self):
+        step = sum(sum(v) for v in self.state_visit_counter.values())
+        self.lam_r = self.init_lam_ref / step ** self.ref_k
+
     def ref_update(self, payoff, state, opp_payoff):
         # Just slowly moving in the new direction instead of all at once, this seems sufficient for our pruposes
         # alternatively we could do some kind of bayesian update, but that feels like overkill to me
@@ -268,6 +276,7 @@ class LearningHumanPTAgent:
 
         self.state_visit_counter[state][action] += 1
 
+        self.lambda_ref_update()
         self.alpha_update(state, action)
 
         ## get next state for q vals and beliefs

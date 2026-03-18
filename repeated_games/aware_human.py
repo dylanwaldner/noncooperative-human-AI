@@ -20,7 +20,11 @@ class AwareHumanPTAgent:
 
         self.agent_id = agent_id  # 0 for row player, 1 for column player
         # Defaulted to 0.95, the number here is pretty arbitrary just the reference update parameter
-        self.lam_r = lambda_ref
+
+        self.init_lam_ref = lambda_ref
+        self.lam_r = self.init_lam_ref
+        self.ref_k = 0.6
+
         self.ref_update_mode = ref_setting
 
         self.B = B
@@ -52,6 +56,9 @@ class AwareHumanPTAgent:
 
         # track ties
         self.softmax_counter = 0 
+
+        # Global step counter
+        self.global_steps = 0
 
         self.pt_l2_dists = []
         self.action_changed_flags = []
@@ -183,6 +190,9 @@ class AwareHumanPTAgent:
         return best_response
 
     def act(self, state=None):
+        self.global_steps += 1
+        self.lam_ref_update()
+
         matrix = self.payoff_matrix
         # Make robust to col/row designation
         if self.agent_id == 1:
@@ -197,6 +207,9 @@ class AwareHumanPTAgent:
         player_best_response = self.get_best_response(matrix, opp_best_responses)
 
         return player_best_response
+
+    def lam_ref_update(self):
+        self.lam_r = self.init_lam_ref / self.global_steps ** self.ref_k        
 
     def ref_update(self, payoff, state, opp_payoff):
         '''

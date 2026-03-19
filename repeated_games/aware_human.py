@@ -241,14 +241,14 @@ class AwareHumanPTAgent:
         # We take the pt transformation just like with LH
         elif self.ref_update_mode == 'V':
             opp_br = self.get_opp_br(self.payoff_matrix)
+            player_best_response = self.get_best_response(self.payoff_matrix, opp_br)
             if self.agent_id == 0:
-                payoffs = self.payoff_matrix[:,opp_br,0]
+                payoffs = self.payoff_matrix[player_best_response,opp_br,0]
 
             else:
-                payoffs = self.payoff_matrix[opp_br, :, 1]
+                payoffs = self.payoff_matrix[opp_br, player_best_response, 1]
             
-            values = np.array([self.pt.value_function(po) for po in payoffs])
-            self.ref_point = values.max()
+            self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * payoffs.max()
 
         # same deal just over opp rewards
         elif self.ref_update_mode == 'EMAOR':

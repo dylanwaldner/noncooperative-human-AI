@@ -144,6 +144,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
                 q_vals = agent1.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)  
+                print("Q vals in Train 1: ", q_vals)
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -184,8 +185,9 @@ def train_agents(agent1, agent2, env, episodes=500,
                 agent2.avg_rew += (reward2 - agent2.avg_rew) / global_step
                 agent2.q_value_update(pt_state2, pt_next_state2, action2, action1, reward2, done)
 
-                # Get q vals, normalize by multiplying by 1 - gamma to remove future discounting
+                # Get q vals
                 q_vals = agent2.get_q_values()
+                print("Q vals in Train: ", q_vals)
                 q_vals = np.asarray(q_vals, dtype=np.float32)
 
                 # Tracking
@@ -341,6 +343,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         pt_params1['r'], pt_params2['r'] = ref_point1, ref_point2
     else:
         ref_point1, ref_point2 = ref_point, ref_point
+        pt_params1, pt_params2 = pt_params.copy(), pt_params.copy()
 
     # Reference point setting
     # Options = Fixed, EMA, Q, 'EMAOR': EMA of Opp rewards

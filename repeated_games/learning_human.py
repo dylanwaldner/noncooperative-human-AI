@@ -238,15 +238,20 @@ class LearningHumanPTAgent:
         # We talked about this in meeting a couple of times, please let me know if it holds
         elif self.ref_update_mode == 'V':
             # Set reference point to maximum, normalized q value
+            '''
             weighted_q_vals = np.zeros(self.action_size)
             for action in range(self.action_size):
                 # Beliefs are over opp actions, so we take the PT transformation for the lottery here 
-                # I chose the PT transformation for the reference point and not the expectation
-                # because our reference point is a part of our decision making process, not learning, which
-                # we defined as pt warped and not in outcome space
-                weighted_q_val = self.pt.expected_pt_value(self.q_values[state][action], self.beliefs[state])
+                # PT transformation here made ref points explode, so usign EU
+                weighted_q_val = self.q_values[state][action].dot(self.beliefs[state])
+                print("Weighted Q val for action ", action, " : ", weighted_q_val)
                 weighted_q_vals[action] = weighted_q_val
+            '''
 
+            q_vals = self.get_q_values()
+            print("Q vals: ", q_vals)
+            beliefs = self.get_avg_beliefs()
+            weighted_q_vals = q_vals.dot(beliefs)
             # Since our policy is just epsilon greedy, we weigh the q vals wrt the policy
             # To get a V(s)
             greedy_action = np.argmax(weighted_q_vals)
@@ -254,8 +259,10 @@ class LearningHumanPTAgent:
             policy[greedy_action] += 1.0 - self.epsilon
 
             V_val = policy.dot(weighted_q_vals)
-            
-            self.ref_point = V_val
+            print("V val: ", V_val)
+            self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * V_val
+
+            print("ref poitn: ", self.ref_point)
 
         elif self.ref_update_mode == 'EMAOR':
             # EMA, but now using the opponents rewards 
@@ -279,14 +286,14 @@ class LearningHumanPTAgent:
         self.lambda_ref_update()
         self.alpha_update(state, action)
 
-        ## get next state for q vals and beliefs
+        ## get avg state value for q vals and beliefs
         q_values = self.get_q_values()
         beliefs = self.get_avg_beliefs()
         #print(f"beliefs: {beliefs}")
 
         # Get maximuj value (not index)
         ## - inf because rewards can be negative
-        optimal_next_q_value = -np.inf
+        avg_state_q_value = -np.inf
 
         eps = 1e-8 # For tie breaks
   
@@ -301,18 +308,20 @@ class LearningHumanPTAgent:
             # Future work could include the pt transformation here, Phade did it in one of the papers i found
             weighted_q_val = np.dot(beliefs, q_val)
 
-            # We are maximizing for bellman update
-            if weighted_q_val > optimal_next_q_value + eps:
-                optimal_next_q_value = weighted_q_val
+            if weighted_q_val > avg_state_q_value + eps:
+                avg_state_q_value = weighted_q_val
 
         # Get stored value (state, joint action value) for bootstrap 
         q_value = self.q_values[state][action][opp_action]
 
-        if self.state_size == 1:
-            optimal_next_q_value = 0
+        # Calculate current state value
+        state_q_val = max(
+            self.q_values[state][a].dot(self.beliefs[state])
+            for a in range(self.action_size)
+        )
 
         # Calculate delta in untransformed reward space
-        delta = reward + optimal_next_q_value 
+        delta = reward + state_q_val - avg_state_q_value
         # Update q values
         self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta
 

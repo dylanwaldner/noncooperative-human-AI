@@ -378,7 +378,7 @@ def interactive_experiment():
             for game_name in games_list:
                 state_histories = [0, 2]
                 for state_history in state_histories:
-                    ref_settings = ["Fixed", "EMA", "V", "EMAOR"]
+                    ref_settings = ["V", "Fixed", "EMA", "EMAOR"]
                     for ref_setting in ref_settings:
                         payoff_matrix = games[game_name]['payoffs']
 

@@ -144,7 +144,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
                 q_vals = agent1.get_q_values()
                 q_vals = np.asarray(q_vals, dtype=np.float32)  
-                print("Q vals in Train 1: ", q_vals)
+                #print("Q vals in Train 1: ", q_vals)
 
                 # Tracking
                 if game_name == 'Double Auction Game':
@@ -187,7 +187,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
                 # Get q vals
                 q_vals = agent2.get_q_values()
-                print("Q vals in Train: ", q_vals)
+                #print("Q vals in Train: ", q_vals)
                 q_vals = np.asarray(q_vals, dtype=np.float32)
 
                 # Tracking

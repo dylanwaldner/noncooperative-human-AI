@@ -243,13 +243,13 @@ class LearningHumanPTAgent:
             for action in range(self.action_size):
                 # Beliefs are over opp actions, so we take the PT transformation for the lottery here 
                 # PT transformation here made ref points explode, so usign EU
-                weighted_q_val = self.q_values[state][action].dot(self.beliefs[state])
+                weighted_q_val = self.pt.expected_pt_value(self.q_values[state][action], self.beliefs[state])
                 print("Weighted Q val for action ", action, " : ", weighted_q_val)
                 weighted_q_vals[action] = weighted_q_val
-            '''
+            ''' 
 
             q_vals = self.get_q_values()
-            print("Q vals: ", q_vals)
+            #print("Q vals: ", q_vals)
             beliefs = self.get_avg_beliefs()
             weighted_q_vals = q_vals.dot(beliefs)
             # Since our policy is just epsilon greedy, we weigh the q vals wrt the policy
@@ -259,10 +259,10 @@ class LearningHumanPTAgent:
             policy[greedy_action] += 1.0 - self.epsilon
 
             V_val = policy.dot(weighted_q_vals)
-            print("V val: ", V_val)
+            #print("V val: ", V_val)
             self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * V_val
 
-            print("ref poitn: ", self.ref_point)
+            #print("ref poitn: ", self.ref_point)
 
         elif self.ref_update_mode == 'EMAOR':
             # EMA, but now using the opponents rewards 

@@ -153,8 +153,14 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
         mean_q_p1 = np.mean(q_values_p1, axis=0)
         se_q_p1 = np.std(q_values_p1, axis=0) / np.sqrt(num_experiments)
 
-        ax4.plot(mean_q_p1[:, 0, 0], label='Action 0', linewidth=1)
-        ax4.plot(mean_q_p1[:, 1, 0], label='Action 1', linewidth=1)
+        if agent1_type == "LH":
+            ax4.plot(mean_q_p1[:, 0, 0], label='a=0, a_-i=0')
+            ax4.plot(mean_q_p1[:, 1, 0], label='a=1, a_-i=0')
+            ax4.plot(mean_q_p1[:, 0, 1], label='a=0, a_-i=1')
+            ax4.plot(mean_q_p1[:, 1, 1], label='a=1, a_-i=1')
+        else:
+            ax4.plot(mean_q_p1[:, 0, 0], label='a=0')
+            ax4.plot(mean_q_p1[:, 1, 0], label='a=1')
 
         x = np.arange(len(mean_q_p1))
 
@@ -188,9 +194,17 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
         se_q_p2 = np.std(q_values_p2, axis=0) / np.sqrt(num_experiments)
 
         x = np.arange(len(mean_q_p2))
-        
-        ax5.plot(mean_q_p2[:, 0, 0], label='Action 0', linewidth=1)
-        ax5.plot(mean_q_p2[:, 1, 0], label='Action 1', linewidth=1)
+
+        if agent2_type == "LH":
+            ax5.plot(mean_q_p2[:, 0, 0], label='a=0, a_-i=0')
+            ax5.plot(mean_q_p2[:, 1, 0], label='a=1, a_-i=0')
+            ax5.plot(mean_q_p2[:, 0, 1], label='a=0, a_-i=1')
+            ax5.plot(mean_q_p2[:, 1, 1], label='a=1, a_-i=1')
+        else:
+            ax5.plot(mean_q_p2[:, 0, 0], label='a=0')
+            ax5.plot(mean_q_p2[:, 1, 0], label='a=1')
+
+
         ax5.fill_between(x, mean_q_p2[:, 0, 0] + 1.96 * se_q_p2[:, 0, 0], mean_q_p2[:, 0, 0] - 1.96 * se_q_p2[:, 0, 0], alpha=0.3)
         ax5.fill_between(x, mean_q_p2[:, 1, 0] + 1.96 * se_q_p2[:, 1, 0], mean_q_p2[:, 1, 0] - 1.96 * se_q_p2[:, 1, 0], alpha=0.3)
 
@@ -254,12 +268,12 @@ def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name
         ax6.plot(mean_changes_p2, label=f'{agent2_type}')
         ax6.fill_between(x, mean_changes_p2 + 1.96 * se_changes_p2, mean_changes_p2 - 1.96 * se_changes_p2, alpha=0.3)
 
-    ax6.set_xlabel("Steps (every 100)")
+    ax6.set_xlabel("Steps")
     ax6.set_ylabel('Q Value Diff')
     ax6.set_title(f'95% Conf. Interval of Q Values Changes Over {len(results.keys())} Runs')
-    ax6.xaxis.set_major_formatter(
-        FuncFormatter(lambda x, pos: f"{int(x*k)}")
-    )
+    #ax6.xaxis.set_major_formatter(
+    #    FuncFormatter(lambda x, pos: f"{int(x*k)}")
+    #)
     ax6.legend()
     ax6.grid(True, alpha=0.3)
 

@@ -100,12 +100,13 @@ class AIAgent:
         # Get the max val for the average state q value
         avg_q_val = self.get_q_values()[:, 0]
         max_avg_q_val = avg_q_val.max()
+        next_state_q_val = self.q_values[state].max()
 
         if self.state_size == 1:
-            max_avg_q_val = 0
+            next_state_q_val = 0
  
         # TD update
-        target = reward + max_avg_q_val
+        target = reward + next_state_q_val - max_avg_q_val
 
         # Convex combination style, just a stylistic difference not a numeric one
         self.q_values[state][action] = (1 - self.alpha) * curr_q_val + self.alpha * target  

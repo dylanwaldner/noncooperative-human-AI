@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import time
 import copy
+import random
+BASE_SEED = 42
 
 from matplotlib.ticker import FuncFormatter
 
@@ -265,7 +267,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                 break
 
         # Store episode results
-        print(f"\rEpisode {episode} of {episodes}", end='')
+        print(f"\rEpisode {episode+1} of {episodes}", end='')
         steps = env.horizon
         avg_reward1 = sum(episode_rewards1) / steps
         avg_reward2 = sum(episode_rewards2) / steps
@@ -298,7 +300,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
         # Progress update
         if verbose and (episode + 1) % 100 == 0:
-            print(f"  Episode {episode + 1}/{episodes}: "
+            print(f"\r  Episode {episode + 1}/{episodes}: "
                   f"Avg rewards = {avg_reward1:.3f}, {avg_reward2:.3f}"
                   f"\n Time since start = {time.time() - start_time}, Time this 100 episodes = {time.time() - last_time}")
 
@@ -403,6 +405,10 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         for idx in range(num_experiments):
             print(f'\nRun {idx + 1} / {num_experiments}')
 
+            seed = BASE_SEED + idx
+            
+            np.random.seed(seed)
+            random.seed(seed)
             # Reset environment
             env = RepeatedGameEnv(payoff_matrix, horizon=100, state_history=state_history)
 

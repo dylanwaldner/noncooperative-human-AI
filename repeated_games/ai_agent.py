@@ -98,7 +98,7 @@ class AIAgent:
         curr_q_val = self.q_values[state][action]
 
         # Get the max val for the average state q value
-        avg_q_val = self.get_q_values()[:, 0]
+        avg_q_val = self.get_q_values()
         max_avg_q_val = avg_q_val.max()
         next_state_q_val = self.q_values[state].max()
 
@@ -114,7 +114,7 @@ class AIAgent:
     # Deprecated Code for the Q-Value convergence metric I was fixated on
     # keeping it in because, im attached
     def get_q_values(self):
-        q_values = np.zeros((self.action_size, self.opp_action_size))
+        q_values = np.zeros(self.action_size)
 
         total_visits = sum(sum(v) for v in self.state_visit_counter.values())
 

@@ -153,19 +153,26 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
         mean_q_p1 = np.mean(q_values_p1, axis=0)
         se_q_p1 = np.std(q_values_p1, axis=0) / np.sqrt(num_experiments)
 
+        x = np.arange(len(mean_q_p1))
+
         if agent1_type == "LH":
             ax4.plot(mean_q_p1[:, 0, 0], label='a=0, a_-i=0')
             ax4.plot(mean_q_p1[:, 1, 0], label='a=1, a_-i=0')
             ax4.plot(mean_q_p1[:, 0, 1], label='a=0, a_-i=1')
             ax4.plot(mean_q_p1[:, 1, 1], label='a=1, a_-i=1')
+
+            ax4.fill_between(x, mean_q_p1[:, 0, 0] + 1.96 * se_q_p1[:, 0, 0], mean_q_p1[:, 0, 0] - 1.96 * se_q_p1[:, 0, 0], alpha=0.3)
+            ax4.fill_between(x, mean_q_p1[:, 1, 0] + 1.96 * se_q_p1[:, 1, 0], mean_q_p1[:, 1, 0] - 1.96 * se_q_p1[:, 1, 0], alpha=0.3)
+            ax4.fill_between(x, mean_q_p1[:, 0, 1] + 1.96 * se_q_p1[:, 0, 1], mean_q_p1[:, 0, 1] - 1.96 * se_q_p1[:, 0, 1], alpha=0.3)
+            ax4.fill_between(x, mean_q_p1[:, 1, 1] + 1.96 * se_q_p1[:, 1, 1], mean_q_p1[:, 1, 1] - 1.96 * se_q_p1[:, 1, 1], alpha=0.3)
+
         else:
-            ax4.plot(mean_q_p1[:, 0, 0], label='a=0')
-            ax4.plot(mean_q_p1[:, 1, 0], label='a=1')
+            ax4.plot(mean_q_p1[:, 0], label='a=0')
+            ax4.plot(mean_q_p1[:, 1], label='a=1')
 
-        x = np.arange(len(mean_q_p1))
+            ax4.fill_between(x, mean_q_p1[:, 0] + 1.96 * se_q_p1[:, 0], mean_q_p1[:, 0] - 1.96 * se_q_p1[:, 0], alpha=0.3)
+            ax4.fill_between(x, mean_q_p1[:, 1] + 1.96 * se_q_p1[:, 1], mean_q_p1[:, 1] - 1.96 * se_q_p1[:, 1], alpha=0.3)
 
-        ax4.fill_between(x, mean_q_p1[:, 0, 0] + 1.96 * se_q_p1[:, 0, 0], mean_q_p1[:, 0, 0] - 1.96 * se_q_p1[:, 0, 0], alpha=0.3)
-        ax4.fill_between(x, mean_q_p1[:, 1, 0] + 1.96 * se_q_p1[:, 1, 0], mean_q_p1[:, 1, 0] - 1.96 * se_q_p1[:, 1, 0], alpha=0.3)
 
         '''
         opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()
@@ -200,13 +207,17 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
             ax5.plot(mean_q_p2[:, 1, 0], label='a=1, a_-i=0')
             ax5.plot(mean_q_p2[:, 0, 1], label='a=0, a_-i=1')
             ax5.plot(mean_q_p2[:, 1, 1], label='a=1, a_-i=1')
+
+            ax5.fill_between(x, mean_q_p2[:, 0, 0] + 1.96 * se_q_p2[:, 0, 0], mean_q_p2[:, 0, 0] - 1.96 * se_q_p2[:, 0, 0], alpha=0.3)
+            ax5.fill_between(x, mean_q_p2[:, 1, 0] + 1.96 * se_q_p2[:, 1, 0], mean_q_p2[:, 1, 0] - 1.96 * se_q_p2[:, 1, 0], alpha=0.3)
+            ax5.fill_between(x, mean_q_p2[:, 0, 1] + 1.96 * se_q_p2[:, 0, 1], mean_q_p2[:, 0, 1] - 1.96 * se_q_p2[:, 0, 1], alpha=0.3)
+            ax5.fill_between(x, mean_q_p2[:, 1, 1] + 1.96 * se_q_p2[:, 1, 1], mean_q_p2[:, 1, 1] - 1.96 * se_q_p2[:, 1, 1], alpha=0.3)
         else:
-            ax5.plot(mean_q_p2[:, 0, 0], label='a=0')
-            ax5.plot(mean_q_p2[:, 1, 0], label='a=1')
+            ax5.plot(mean_q_p2[:, 0], label='a=0')
+            ax5.plot(mean_q_p2[:, 1], label='a=1')
 
-
-        ax5.fill_between(x, mean_q_p2[:, 0, 0] + 1.96 * se_q_p2[:, 0, 0], mean_q_p2[:, 0, 0] - 1.96 * se_q_p2[:, 0, 0], alpha=0.3)
-        ax5.fill_between(x, mean_q_p2[:, 1, 0] + 1.96 * se_q_p2[:, 1, 0], mean_q_p2[:, 1, 0] - 1.96 * se_q_p2[:, 1, 0], alpha=0.3)
+            ax5.fill_between(x, mean_q_p2[:, 0] + 1.96 * se_q_p2[:, 0], mean_q_p2[:, 0] - 1.96 * se_q_p2[:, 0], alpha=0.3)
+            ax5.fill_between(x, mean_q_p2[:, 1] + 1.96 * se_q_p2[:, 1], mean_q_p2[:, 1] - 1.96 * se_q_p2[:, 1], alpha=0.3)
 
         '''
         opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()

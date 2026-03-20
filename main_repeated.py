@@ -379,7 +379,7 @@ def interactive_experiment():
             for game_name in games_list:
                 state_histories = [0, 2]
                 for state_history in state_histories:
-                    ref_settings = ["V", "Fixed", "EMA", "EMAOR"]
+                    ref_settings = ["Fixed", "EMA", "V", "EMAOR"]
                     for ref_setting in ref_settings:
                         payoff_matrix = games[game_name]['payoffs']
 
@@ -394,6 +394,7 @@ def interactive_experiment():
                         print(f"\nStarting complete experiment for {game_name}...")
                         all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments)
 
+                        print(len(all_results))
 
                         # Compare results
                         data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting)

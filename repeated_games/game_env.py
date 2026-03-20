@@ -8,10 +8,10 @@ class RepeatedGameEnv:
         self.horizon = horizon
         self.state_history = state_history
         self.state_size = 4 ** state_history
+        self.history = []
 
     def reset(self):
         self.round = 0
-        self.history = []
         return self._get_state()
 
     def _get_state(self, ref_bin=None):
@@ -37,6 +37,7 @@ class RepeatedGameEnv:
         reward2 = float(self.payoff_matrix[action1, action2, 1])
 
         self.history.append((action1, action2))
+        self.history = self.history[-self.state_history:]
         self.round += 1
 
         done = self.round >= self.horizon

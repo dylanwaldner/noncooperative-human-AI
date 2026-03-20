@@ -42,7 +42,7 @@ class LearningHumanPTAgent:
 
         self.init_lam_ref = lambda_ref
         self.lam_r = self.init_lam_ref
-        self.ref_k = 0.6
+        self.ref_k = 0.9
 
         # Set reference point update mode:
         # options: Fixed, EMA, Max Q value (conditioned on beliefs over opp actions), 

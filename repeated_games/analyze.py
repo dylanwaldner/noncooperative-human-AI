@@ -12,7 +12,7 @@ import json
 
 DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
 
-def analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_type, env):
+def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_type, env):
     """
     I am not going through in line, and i went a little in depth on the read me. 
     I feel like this is pretty straightforward, but if its not please just send me an email,

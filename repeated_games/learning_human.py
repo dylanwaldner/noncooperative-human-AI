@@ -87,7 +87,7 @@ class LearningHumanPTAgent:
         self.pt_l2_dists = []
         self.action_changed_flags = []
 
-  def transform_state(self, state):
+    def transform_state(self, state):
         # Transform the states from the s(H) to s(H)B format
         # First, normalize for simplicity
         low = self.min_payoff
@@ -324,8 +324,7 @@ class LearningHumanPTAgent:
         # Update q values
         self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta
 
-    # Deprecated from the q value convergence metric i was talking about
-    # im not removing it because I am attached to it, but its not hurting anything
+    # Retrieve weighted average state Q values
     def get_q_values(self):
         q_values = np.zeros((self.action_size, self.opp_action_size))
 
@@ -346,6 +345,7 @@ class LearningHumanPTAgent:
 
         return q_values
 
+    # Average state beliefs: needed for average state q value calculation
     def get_avg_beliefs(self):
         avg_beliefs = np.zeros(self.opp_action_size)
 

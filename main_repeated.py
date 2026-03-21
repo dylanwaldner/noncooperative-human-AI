@@ -375,7 +375,7 @@ def interactive_experiment():
         elif choice == '4':
             games_list = list(games.keys())
             all_results = dict()
-            for game_name in games_list[1:]:
+            for game_name in games_list:
                 state_histories = [0, 2]
                 for state_history in state_histories:
                     ref_settings = ["Fixed", "EMA", "V", "EMAOR"]
@@ -392,8 +392,6 @@ def interactive_experiment():
                         # Store results
                         print(f"\nStarting complete experiment for {game_name}...")
                         all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments)
-
-                        print(len(all_results))
 
                         # Compare results
                         data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting, games)

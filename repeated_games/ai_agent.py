@@ -36,7 +36,7 @@ class AIAgent:
 
         self.alpha = 0.1
         self.init_alpha = self.alpha
-        self.k = 0.6
+        self.k = 0.6 # Decay rate
 
         # tiebreaker variables
         self.tau = 0.1 # threshold
@@ -111,8 +111,7 @@ class AIAgent:
         # Convex combination style, just a stylistic difference not a numeric one
         self.q_values[state][action] = (1 - self.alpha) * curr_q_val + self.alpha * target  
        
-    # Deprecated Code for the Q-Value convergence metric I was fixated on
-    # keeping it in because, im attached
+    # Retrieve weighted average state Q values
     def get_q_values(self):
         q_values = np.zeros(self.action_size)
 

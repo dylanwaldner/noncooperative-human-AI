@@ -15,7 +15,7 @@ BASE_SEED = 42
 from matplotlib.ticker import FuncFormatter
 
 def train_agents(agent1, agent2, env, episodes=500,
-                 exploration_decay=0.995, verbose=True, game_name=''):
+                 exploration_decay=0.99, verbose=True, game_name=''):
     """
     Train two agents against each other
 
@@ -98,11 +98,11 @@ def train_agents(agent1, agent2, env, episodes=500,
                 if isinstance(agent1, LearningHumanPTAgent):
                     pt_state1 = agent1.transform_state(state)
                     action1 = agent1.act(pt_state1)
-                else:
+                else: # Aware Human
                     pt_state1 = agent1.transform_state(state)
                     action1 = agent1.act(last_action2)
 
-            else:
+            else: # AI Agent
                 pt_state1 = None
                 # Agent 1 chooses action
                 action1 = agent1.act(state)
@@ -293,10 +293,10 @@ def train_agents(agent1, agent2, env, episodes=500,
         
         # Decay exploration
         if isinstance(agent1, (LearningHumanPTAgent, AIAgent)):
-            agent1.epsilon = max(agent1.epsilon * exploration_decay, agent1.epsilon_min)
+            agent1.epsilon = agent1.epsilon * exploration_decay
 
         if isinstance(agent2, (LearningHumanPTAgent, AIAgent)):
-            agent2.epsilon = max(agent2.epsilon * exploration_decay, agent2.epsilon_min)
+            agent2.epsilon = agent2.epsilon * exploration_decay
 
         # Progress update
         if verbose and (episode + 1) % 100 == 0:

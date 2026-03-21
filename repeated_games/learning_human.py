@@ -87,13 +87,11 @@ class LearningHumanPTAgent:
         self.pt_l2_dists = []
         self.action_changed_flags = []
 
-    def transform_state(self, state):
+  def transform_state(self, state):
         # Transform the states from the s(H) to s(H)B format
         # First, normalize for simplicity
-        low = min(self.min_payoff, self.ref_point)
-        high = max(self.max_payoff, self.ref_point)
-
-        self.min_payoff, self.max_payoff = low, high
+        low = self.min_payoff
+        high = self.max_payoff
 
         denom = high - low
         if denom == 0:
@@ -101,13 +99,13 @@ class LearningHumanPTAgent:
         else:
             norm_ref_point = (self.ref_point - low) / denom
 
-        ref_bin = None
+        # Clip to 0, 1 for binning
+        norm_ref_point = max(0.0, min(1.0, norm_ref_point))
 
+        # Get its bin
         ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
 
-        if ref_bin is None:
-            raise TypeError("Ref bin never updated")
-
+        # Use the bin to get the transformed state
         pt_state = state * self.B + ref_bin
         return pt_state
 
@@ -321,6 +319,7 @@ class LearningHumanPTAgent:
         )
 
         # Calculate delta in untransformed reward space
+        # This update rule is 7.39 in Neurodynamic Programming (adapted from DP to RL)
         delta = reward + state_q_val - avg_state_q_value
         # Update q values
         self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta

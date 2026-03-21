@@ -402,6 +402,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         if state_history == 0:
             if agent1_type == "AH2" or agent2_type == "AH2":
                 continue
+
         for idx in range(num_experiments):
             print(f'\nRun {idx + 1} / {num_experiments}')
 

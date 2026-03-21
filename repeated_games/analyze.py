@@ -481,7 +481,7 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     print("\nPerformance Comparison (mean of last 50 episodes across runs):")
     print(df.to_string(index=False))
 
-    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(16, 12))
+    fig, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8)) = plt.subplots(2, 4, figsize=(20, 12))
 
     # ------------------------------------------------------------------
     # Bar plot of average rewards with 95% CI
@@ -911,6 +911,8 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
             flat_1 = [a for ep in last_actions_1 for a in ep]
             flat_2 = [a for ep in last_actions_2 for a in ep]
 
+            print(len(flat_1), len(flat_2))
+
             if len(flat_1) == 0 or len(flat_2) == 0:
                 continue
 
@@ -1009,11 +1011,69 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ax6.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax6.set_xlabel("Matchup")
     ax6.set_ylabel("Best-Response Value - Policy Value")
-    ax6.set_title("Final Mixed-Strategy Exploitability by Matchup")
+    ax6.set_title("Missed Exploitability by Matchup")
     ax6.set_xticks(x)
     ax6.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
     ax6.legend()
     ax6.grid(True, alpha=0.3, axis="y")
+
+
+    exploit_data = []
+
+    for matchup_key, data in all_results.items():
+        run_gaps1 = []
+        run_gaps2 = []
+
+        for run_id, run_results in data.items():
+            best1 = np.asarray(run_results.get("best_rewards1", []), dtype=float).flatten()
+            raw1 = np.asarray(run_results.get("raw_rewards1", []), dtype=float).flatten()
+            best2 = np.asarray(run_results.get("best_rewards2", []), dtype=float).flatten()
+            raw2 = np.asarray(run_results.get("raw_rewards2", []), dtype=float).flatten()
+
+            if len(best1) < last_n or len(best2) < last_n:
+                continue
+
+            run_gaps1.append(np.mean((best1 - raw1)[-last_n:]))
+            run_gaps2.append(np.mean((best2 - raw2)[-last_n:]))
+
+        if not run_gaps1 or not run_gaps2:
+            continue
+
+        run_gaps1 = np.asarray(run_gaps1)
+        run_gaps2 = np.asarray(run_gaps2)
+
+        ci1 = 1.96 * run_gaps1.std(ddof=1) / np.sqrt(len(run_gaps1)) if len(run_gaps1) > 1 else 0.0
+        ci2 = 1.96 * run_gaps2.std(ddof=1) / np.sqrt(len(run_gaps2)) if len(run_gaps2) > 1 else 0.0
+
+        exploit_data.append({
+            "Matchup": matchup_key,
+            "Agent1_Gap": run_gaps1.mean(),
+            "Agent1_CI": ci1,
+            "Agent2_Gap": run_gaps2.mean(),
+            "Agent2_CI": ci2,
+        })
+
+    exploit_df = pd.DataFrame(exploit_data)
+    exploit_df = exploit_df.set_index("Matchup").loc[df["Matchup"]].reset_index()
+
+    x = np.arange(len(exploit_df["Matchup"]))
+
+    ax7.bar(x - width/2, exploit_df["Agent1_Gap"], width, yerr=exploit_df["Agent1_CI"],
+            label="Agent 1", alpha=0.7, capsize=4)
+    ax7.bar(x + width/2, exploit_df["Agent2_Gap"], width, yerr=exploit_df["Agent2_CI"],
+            label="Agent 2", alpha=0.7, capsize=4)
+    ax7.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax7.set_xlabel("Matchup")
+    ax7.set_ylabel("Best Response Reward - Actual Reward")
+    ax7.set_title("Exploitability Gap by Matchup")
+    ax7.set_xticks(x)
+    ax7.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
+    ax7.legend()
+    ax7.grid(True, alpha=0.3, axis="y")
+
+    ax8.axis('off')
+
+
     fig.suptitle(f"{game_name} — Learning Results Across Matchups - Last {last_n} Episodes", fontsize=16)
 
     fig.subplots_adjust(

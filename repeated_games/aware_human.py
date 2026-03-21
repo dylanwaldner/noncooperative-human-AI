@@ -23,7 +23,7 @@ class AwareHumanPTAgent:
 
         self.init_lam_ref = lambda_ref
         self.lam_r = self.init_lam_ref
-        self.ref_k = 0.6
+        self.ref_k = 0.9
 
         self.ref_update_mode = ref_setting
 
@@ -67,10 +67,8 @@ class AwareHumanPTAgent:
     def transform_state(self, state):
         # Transform the states from the s(H) to s(H)B format
         # First, normalize for simplicity
-        low = min(self.min_payoff, self.ref_point)
-        high = max(self.max_payoff, self.ref_point)
-
-        self.min_payoff, self.max_payoff = low, high
+        low = self.min_payoff
+        high = self.max_payoff
 
         denom = high - low
         if denom == 0:
@@ -78,13 +76,13 @@ class AwareHumanPTAgent:
         else:
             norm_ref_point = (self.ref_point - low) / denom
 
-        ref_bin = None
+        # Clip to 0, 1 for binning
+        norm_ref_point = max(0.0, min(1.0, norm_ref_point))
 
+        # Get its bin
         ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
 
-        if ref_bin is None:
-            raise TypeError("Ref bin never updated")
-
+        # Use the bin to get the transformed state
         pt_state = state * self.B + ref_bin
         return pt_state
 
@@ -209,6 +207,7 @@ class AwareHumanPTAgent:
             player_best_response = self.get_best_response(matrix, opp_best_responses)
 
         else:
+            # tit for tat
             player_best_response = last_opp_action
 
         return player_best_response

@@ -2,7 +2,6 @@ import numpy as np
 from collections import deque
 import random
 import matplotlib.pyplot as plt
-from IPython.display import clear_output, display
 import warnings
 warnings.filterwarnings('ignore')
 import pandas as pd
@@ -397,7 +396,7 @@ def interactive_experiment():
                         print(len(all_results))
 
                         # Compare results
-                        data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting)
+                        data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting, games)
 
 
         elif choice == '5':

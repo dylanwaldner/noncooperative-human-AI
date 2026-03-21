@@ -404,7 +404,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
 
     #plt.show()
 
-def compare_all_results(all_results, game_name, state_history, num_experiments, ref_type):
+def compare_all_results(all_results, game_name, state_history, num_experiments, ref_type, payoff_table):
     """Compare performance across all matchups using the last 50 episodes of each run.
 
     Assumes:
@@ -889,38 +889,95 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ax5.legend()
     ax5.grid(True, alpha=0.3, axis="y")
 
+    last_n = 50
     exploit_data = []
 
+    # 2x2x2 payoff array:
+    # payoffs[a1, a2, 0] = player 1 reward
+    # payoffs[a1, a2, 1] = player 2 reward
+    payoffs = payoff_table[game_name]['payoffs']
+
     for matchup_key, data in all_results.items():
-        run_gaps1 = []
-        run_gaps2 = []
+        run_exploit1 = []
+        run_exploit2 = []
 
-        for run_id, run_results in data.items():
-            best1 = np.asarray(run_results.get("best_rewards1", []), dtype=float).flatten()
-            raw1 = np.asarray(run_results.get("raw_rewards1", []), dtype=float).flatten()
-            best2 = np.asarray(run_results.get("best_rewards2", []), dtype=float).flatten()
-            raw2 = np.asarray(run_results.get("raw_rewards2", []), dtype=float).flatten()
+        for run_id, exp in data.items():
+            actions_1 = exp["actions1"]
+            actions_2 = exp["actions2"]
 
-            if len(best1) < last_n or len(best2) < last_n:
+            last_actions_1 = actions_1[-last_n:]
+            last_actions_2 = actions_2[-last_n:]
+
+            flat_1 = [a for ep in last_actions_1 for a in ep]
+            flat_2 = [a for ep in last_actions_2 for a in ep]
+
+            if len(flat_1) == 0 or len(flat_2) == 0:
                 continue
 
-            run_gaps1.append(np.mean((best1 - raw1)[-last_n:]))
-            run_gaps2.append(np.mean((best2 - raw2)[-last_n:]))
+            c1 = Counter(flat_1)
+            c2 = Counter(flat_2)
 
-        if not run_gaps1 or not run_gaps2:
+            total1 = sum(c1.values())
+            total2 = sum(c2.values())
+
+            # Empirical mixed strategies
+            p1 = np.array([
+                c1.get(0, 0) / total1,
+                c1.get(1, 0) / total1
+            ], dtype=float)
+
+            p2 = np.array([
+                c2.get(0, 0) / total2,
+                c2.get(1, 0) / total2
+            ], dtype=float)
+
+            # Actual expected rewards under empirical mixed play
+            actual_p1 = 0.0
+            actual_p2 = 0.0
+            for a1 in range(2):
+                for a2 in range(2):
+                    prob = p1[a1] * p2[a2]
+                    actual_p1 += prob * payoffs[a1, a2, 0]
+                    actual_p2 += prob * payoffs[a1, a2, 1]
+
+            # Best response value for player 1 against p2
+            br_vals_p1 = []
+            for a1 in range(2):
+                val = 0.0
+                for a2 in range(2):
+                    val += p2[a2] * payoffs[a1, a2, 0]
+                br_vals_p1.append(val)
+            br_p1 = max(br_vals_p1)
+
+            # Best response value for player 2 against p1
+            br_vals_p2 = []
+            for a2 in range(2):
+                val = 0.0
+                for a1 in range(2):
+                    val += p1[a1] * payoffs[a1, a2, 1]
+                br_vals_p2.append(val)
+            br_p2 = max(br_vals_p2)
+
+            exploit1 = br_p1 - actual_p1
+            exploit2 = br_p2 - actual_p2
+
+            run_exploit1.append(exploit1)
+            run_exploit2.append(exploit2)
+
+        if len(run_exploit1) == 0 or len(run_exploit2) == 0:
             continue
 
-        run_gaps1 = np.asarray(run_gaps1)
-        run_gaps2 = np.asarray(run_gaps2)
+        run_exploit1 = np.asarray(run_exploit1, dtype=float)
+        run_exploit2 = np.asarray(run_exploit2, dtype=float)
 
-        ci1 = 1.96 * run_gaps1.std(ddof=1) / np.sqrt(len(run_gaps1)) if len(run_gaps1) > 1 else 0.0
-        ci2 = 1.96 * run_gaps2.std(ddof=1) / np.sqrt(len(run_gaps2)) if len(run_gaps2) > 1 else 0.0
+        ci1 = 1.96 * run_exploit1.std(ddof=1) / np.sqrt(len(run_exploit1)) if len(run_exploit1) > 1 else 0.0
+        ci2 = 1.96 * run_exploit2.std(ddof=1) / np.sqrt(len(run_exploit2)) if len(run_exploit2) > 1 else 0.0
 
         exploit_data.append({
             "Matchup": matchup_key,
-            "Agent1_Gap": run_gaps1.mean(),
+            "Agent1_Exploit": run_exploit1.mean(),
             "Agent1_CI": ci1,
-            "Agent2_Gap": run_gaps2.mean(),
+            "Agent2_Exploit": run_exploit2.mean(),
             "Agent2_CI": ci2,
         })
 
@@ -929,19 +986,34 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
 
     x = np.arange(len(exploit_df["Matchup"]))
 
-    ax6.bar(x - width/2, exploit_df["Agent1_Gap"], width, yerr=exploit_df["Agent1_CI"],
-            label="Agent 1", alpha=0.7, capsize=4)
-    ax6.bar(x + width/2, exploit_df["Agent2_Gap"], width, yerr=exploit_df["Agent2_CI"],
-            label="Agent 2", alpha=0.7, capsize=4)
+    ax6.bar(
+        x - width/2,
+        exploit_df["Agent1_Exploit"],
+        width,
+        yerr=exploit_df["Agent1_CI"],
+        label="Agent 1",
+        alpha=0.7,
+        capsize=4
+    )
+
+    ax6.bar(
+        x + width/2,
+        exploit_df["Agent2_Exploit"],
+        width,
+        yerr=exploit_df["Agent2_CI"],
+        label="Agent 2",
+        alpha=0.7,
+        capsize=4
+    )
+
     ax6.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax6.set_xlabel("Matchup")
-    ax6.set_ylabel("Best Response Reward - Actual Reward")
-    ax6.set_title("Exploitability Gap by Matchup")
+    ax6.set_ylabel("Best-Response Value - Policy Value")
+    ax6.set_title("Final Mixed-Strategy Exploitability by Matchup")
     ax6.set_xticks(x)
     ax6.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
     ax6.legend()
     ax6.grid(True, alpha=0.3, axis="y")
-
     fig.suptitle(f"{game_name} — Learning Results Across Matchups - Last {last_n} Episodes", fontsize=16)
 
     fig.subplots_adjust(

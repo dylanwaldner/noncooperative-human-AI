@@ -50,7 +50,7 @@ def interactive_experiment():
 
         num_experiments = int(input("\nEnter Number of Experiment Runs (Rec. For Prod Run: 30): ").strip())
 
-        if choice != '4':
+        if choice not in ['3', '4']:
 
             print("\n" + "="*80)
             print("Set State History (Recommended: Choose 0 or 2)")
@@ -261,6 +261,7 @@ def interactive_experiment():
             # Custom matchup
             print("\nDouble Auction Game")
             print("-"*40)
+            # FOr double auction player 1 is the buyer, player 2 is the seller
             game_name = "Double Auction Game"
             games_dict = ""
 
@@ -285,92 +286,30 @@ def interactive_experiment():
                 if cost <= 0 or cost > price_range:
                     print("Invalid input, try again")
 
-            # Select agent types
-            print("\nAgent types: AH, LH, AI")
-            valid_types = ['AH', 'LH', 'AI']
-            agent1_type, agent2_type = "", ""
 
-            while agent1_type not in valid_types or agent2_type not in valid_types:
-                agent1_type = input("Agent 1 type: ").strip()
-                agent2_type = input("Agent 2 type: ").strip()
+            state_histories = [0, 2] 
+            for state_history in state_histories: 
+                env = DoubleAuction(k=price_range, valuation=valuation, cost=cost, horizon=100, state_history=state_history)
+                ref_settings = ["Fixed", "EMA", "V", "EMAOR"] 
+                for ref_setting in ref_settings: 
+                    # FOr double auction player 1 is the buyer, player 2 is the seller
+                    payoff_matrix = env.build_payoff_matrix()
+                    if ref_setting == "Fixed": 
+                        ref_point1 = valuation 
+                        ref_point2 = cost 
 
-                if agent1_type not in valid_types or agent2_type not in valid_types:
-                    print("Agents input incorrectly, try again")
+                        r = [ref_point1, ref_point2] 
 
-            # Get parameters
-            episodes = input("Episodes (default 200): ").strip()
-            episodes = int(episodes) if episodes.isdigit() else 200
+                    print(f"\nStarting complete experiment for {game_name}...") 
+                    # Store results 
+                    print(f"\nStarting complete experiment for {game_name}...") 
+                    all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments, action_size=price_range) 
 
-            # Run custom matchup
-            print(f"\nRunning {agent1_type} vs {agent2_type} in {game_name}...")
-
-            env = DoubleAuction(k=price_range, valuation=valuation, cost=cost, horizon=100, state_history=state_history)
-            payoff_matrix = env.build_payoff_matrix()
-
-            # Reference point setting
-            # Options = Fixed, EMA, Q, EMAOR
-            ref_lambda = 0.9
-
-            # Create agents
-            action_size = price_range
-            if agent1_type == 'LH':
-                agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, 0, ref_setting=ref_setting, lambda_ref = ref_lambda)
-            elif agent1_type == "AI":
-                agent1 = AIAgent(env.state_size, action_size, action_size, 0)
-
-            if agent2_type == 'LH':
-                agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params, 1, ref_setting=ref_setting, lambda_ref = ref_lambda)
-            elif agent2_type == 'AI':
-                agent2 = AIAgent(env.state_size, action_size, action_size, 1)
-
-            if agent1_type == 'AH':
-                opp_params = dict()
-                opp_params['opponent_type'] = agent2_type
-                opp_params['opponent_action_size'] = action_size
-                opp_params['opp_ref'] = None
-                if agent2_type != "AI":
-                    if agent2_type == "AH":
-                        opp_params['opp_ref'] = 0 # Setting static for now, will have to coordinate with external variable 
-                    else:
-                        opp_params['opp_ref'] = agent2.ref_point
-                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params, action_size, env.state_size, agent_id=0, opp_params=opp_params, ref_setting=ref_setting, lambda_ref = ref_lambda)
-
-            if agent2_type == 'AH':
-                opp_params = dict()
-                opp_params['opponent_type'] = agent1_type
-                opp_params['opponent_action_size'] = action_size
-                opp_params['opp_ref'] = None
-                if agent1_type != "AI":
-                    opp_params['opp_ref'] = agent1.ref_point
-                agent2 = AwareHumanPTAgent(payoff_matrix, pt_params, action_size, env.state_size, agent_id=1,opp_params=opp_params, ref_setting=ref_setting, lambda_ref = ref_lambda)
+                    # Compare results 
+                    data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting, games) 
 
 
-            # Train
-            results = train_agents(agent1, agent2, env, episodes=episodes, verbose=True, game_name=game_name)
- 
-            # Analyze
-            print('Agent 1 Softmax triggers: ', agent1.softmax_counter)
-            print('Agent 2 Softmax triggers: ', agent2.softmax_counter)
 
-            if agent1_type != 'AH':
-                agent1_q_vals = agent1.get_q_values()
-                #print(f"Agent 1 state visits: {agent1.state_visit_counter}")
-                #print(f"Agent 1 raw q values = {agent1_q_vals}, agent 1 normalized q values = {(1-agent1.gamma) * agent1_q_vals}")
-
-            if agent2_type != 'AH':
-                agent2_q_vals = agent2.get_q_values()
-                #print(f"Agent 2 raw q values = {agent2_q_vals}, agent 2 normalized q values = {(1-agent2.gamma) * agent2_q_vals}")
-
-                #print(f"Agent 2 state visits: {agent2.state_visit_counter}")
-
-
-            #if hasattr(agent1, "beliefs") and price_range < 5:
-                #print(f"Agent 1 beliefs: {agent1.beliefs}")
-
-            #if hasattr(agent2, "beliefs") and price_range < 5:
-                #print(f"Agent 2 beliefs: {agent2.beliefs}")
-
-            analyze_matchup(results, agent1, agent2, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params)
 
         elif choice == '4':
             games_list = list(games.keys())

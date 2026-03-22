@@ -44,7 +44,6 @@ class DoubleAuction:
 
   def reset(self):
     self.round = 0
-    self.history = []
     return self._get_state()
 
   def _get_state(self):
@@ -73,6 +72,7 @@ class DoubleAuction:
     assert bid in self.B and ask in self.A, f"bid: {bid}, ask: {ask}"
   
     self.history.append((bid, ask))
+    self.history = self.history[-self.state_history:]
     self.round += 1
 
     done = self.round >= self.horizon

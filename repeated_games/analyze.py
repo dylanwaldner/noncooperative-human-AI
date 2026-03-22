@@ -110,7 +110,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     mean_joint_actions = np.mean(joint_actions, axis=0)
     im = ax3.imshow(mean_joint_actions, aspect='auto', origin='lower')
     fig.colorbar(im, ax=ax3, label='Count')
-    MAX_ACTIONS = 3
+    MAX_ACTIONS = 6
 
     if mean_joint_actions.shape[0] <= MAX_ACTIONS and mean_joint_actions.shape[1] <= MAX_ACTIONS:
         for i in range(mean_joint_actions.shape[0]):

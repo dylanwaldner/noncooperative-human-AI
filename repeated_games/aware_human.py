@@ -154,18 +154,24 @@ class AwareHumanPTAgent:
         # Get max value and second max val for tie breaks
         opt_a = np.argmax(best_vals) # best
         # Check if the CPT transformation influences action decision
-        EU_opt_a = np.argmax(EU_best_vals)
-
         tol = 1e-8
 
-        EU_diff = EU_best_vals[0] - EU_best_vals[1]
-        PT_diff = best_vals[0] - best_vals[1]
+        EU_opt_a = np.argmax(EU_best_vals)
+        PT_opt_a = np.argmax(best_vals)
 
-        if abs(EU_diff) < tol or abs(PT_diff) < tol:
-            action_changed = 0
+        # detect ties at the top
+        eu_max = EU_best_vals[EU_opt_a]
+        pt_max = best_vals[PT_opt_a]
+
+        EU_tie = np.sum(np.abs(EU_best_vals - eu_max) < tol) > 1
+        PT_tie = np.sum(np.abs(best_vals - pt_max) < tol) > 1
+
+        # only count change if neither has a tie
+        if EU_tie or PT_tie:
+           action_changed = 0
         else:
-            action_changed = int(np.sign(EU_diff) != np.sign(PT_diff))
-
+           action_changed = int(EU_opt_a != PT_opt_a)
+        
         self.action_changed_flags.append(action_changed)
 
         subopt_vals = best_vals.copy() # copy to prevent in place mutilation
@@ -194,10 +200,10 @@ class AwareHumanPTAgent:
             self.lam_ref_update()
 
             matrix = self.payoff_matrix
+
             # Make robust to col/row designation
             if self.agent_id == 1:
                 matrix = matrix.transpose(1, 0, 2)
-
 
             # First we need to get the opp best responses to our actions 
             opp_best_responses = self.get_opp_br(matrix)

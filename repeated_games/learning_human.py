@@ -131,18 +131,20 @@ class LearningHumanPTAgent:
         # We mark all near tie values to be False to ensure integrity
         tol = 1e-8
 
-        EU_gap = EU_action_values[0] - EU_action_values[1]
-        PT_gap = action_values[0] - action_values[1]
+        EU_opt_a = np.argmax(EU_action_values)
+        PT_opt_a = np.argmax(action_values)
 
-        # ignore ties
-        EU_tie = abs(EU_gap) < tol
-        PT_tie = abs(PT_gap) < tol
+        # check ties at the top
+        eu_max = EU_action_values[EU_opt_a]
+        pt_max = action_values[PT_opt_a]
+
+        EU_tie = np.sum(np.abs(EU_action_values - eu_max) < tol) > 1
+        PT_tie = np.sum(np.abs(action_values - pt_max) < tol) > 1
 
         if EU_tie or PT_tie:
             action_changed = 0
         else:
-            action_changed = int(np.sign(EU_gap) != np.sign(PT_gap))
- 
+            action_changed = int(EU_opt_a != PT_opt_a) 
 
         self.pt_l2_dists.append(PT_L2_dist)
         self.action_changed_flags.append(action_changed)

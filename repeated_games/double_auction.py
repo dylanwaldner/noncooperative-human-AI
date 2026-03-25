@@ -40,6 +40,9 @@ class DoubleAuction:
         else:
           payoff_matrix[i, j] = (0, 0)
 
+    with np.printoptions(threshold=np.inf):
+        print(payoff_matrix)
+
     return payoff_matrix
 
   def reset(self):

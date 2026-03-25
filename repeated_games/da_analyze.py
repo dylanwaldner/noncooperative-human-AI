@@ -12,7 +12,7 @@ import json
 
 DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
 
-def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_type, env):
+def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matrix, pt_params, ref_type, env):
     """
     I am not going through in line, and i went a little in depth on the read me. 
     I feel like this is pretty straightforward, but if its not please just send me an email,
@@ -142,6 +142,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     # 4. Q value convergence 
     # 4. Q value convergence - Player 1
     ax4 = plt.subplot(3, 3, 4)
+
     if len(results["0"]['q_values1']) > 0:
         q_values_p1 = []
         for idx in range(len(results.keys())):
@@ -150,43 +151,58 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
 
         q_values_p1 = np.stack(q_values_p1)
 
-        mean_q_p1 = np.mean(q_values_p1, axis=0)
-        se_q_p1 = np.std(q_values_p1, axis=0) / np.sqrt(num_experiments)
+        # mean over runs
+        mean_q_p1 = np.mean(q_values_p1, axis=0)  # shape: [time, a, a_-i]
 
-        x = np.arange(len(mean_q_p1))
+        # collapse time (use final step OR average over time)
+        final_q = mean_q_p1[-1]   # shape: [a, a_-i]
+        # alternatively:
+        # final_q = np.mean(mean_q_p1, axis=0)
 
         if agent1_type == "LH":
-            ax4.plot(mean_q_p1[:, 0, 0], label='a=0, a_-i=0')
-            ax4.plot(mean_q_p1[:, 1, 0], label='a=1, a_-i=0')
-            ax4.plot(mean_q_p1[:, 0, 1], label='a=0, a_-i=1')
-            ax4.plot(mean_q_p1[:, 1, 1], label='a=1, a_-i=1')
+            final_q = final_q.T
+            im = ax4.imshow(final_q, aspect='auto')
 
-            ax4.fill_between(x, mean_q_p1[:, 0, 0] + 1.96 * se_q_p1[:, 0, 0], mean_q_p1[:, 0, 0] - 1.96 * se_q_p1[:, 0, 0], alpha=0.3)
-            ax4.fill_between(x, mean_q_p1[:, 1, 0] + 1.96 * se_q_p1[:, 1, 0], mean_q_p1[:, 1, 0] - 1.96 * se_q_p1[:, 1, 0], alpha=0.3)
-            ax4.fill_between(x, mean_q_p1[:, 0, 1] + 1.96 * se_q_p1[:, 0, 1], mean_q_p1[:, 0, 1] - 1.96 * se_q_p1[:, 0, 1], alpha=0.3)
-            ax4.fill_between(x, mean_q_p1[:, 1, 1] + 1.96 * se_q_p1[:, 1, 1], mean_q_p1[:, 1, 1] - 1.96 * se_q_p1[:, 1, 1], alpha=0.3)
+            # annotate cells
+            for i in range(final_q.shape[0]):
+                for j in range(final_q.shape[1]):
+                    ax4.text(j, i, f"{final_q[i, j]:.2f}",
+                             ha='center', va='center', color='white')
+
+            ax4.set_xlabel("LH Action")
+            ax4.set_ylabel("Opponent Action")
+
+            ax4.set_title(f"{agent1_type} Q-Value Heatmap (Final Step)")
+
+            ax4.set_xticks(np.arange(5))
+            ax4.set_yticks(np.arange(5))
+
+            ax4.set_xticklabels(np.arange(1, 6))
+            ax4.set_yticklabels(np.arange(1, 6))
+
+            plt.colorbar(im, ax=ax4)
 
         else:
-            ax4.plot(mean_q_p1[:, 0], label='a=0')
-            ax4.plot(mean_q_p1[:, 1], label='a=1')
+            final_q = final_q.reshape(1, -1)
 
-            ax4.fill_between(x, mean_q_p1[:, 0] + 1.96 * se_q_p1[:, 0], mean_q_p1[:, 0] - 1.96 * se_q_p1[:, 0], alpha=0.3)
-            ax4.fill_between(x, mean_q_p1[:, 1] + 1.96 * se_q_p1[:, 1], mean_q_p1[:, 1] - 1.96 * se_q_p1[:, 1], alpha=0.3)
+            im = ax4.imshow(final_q, aspect='auto')
 
+            for j in range(final_q.shape[1]):
+                ax4.text(j, 0, f"{final_q[0, j]:.2f}",
+                         ha='center', va='center', color='white')
 
-        '''
-        opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()
-        expected_payoff_a0 = payoff_matrix[0, :, 0] @ opp_freq
-        expected_payoff_a1 = payoff_matrix[1, :, 0] @ opp_freq
-        ax4.axhline(expected_payoff_a0, linestyle="--", color='gray', alpha=0.5, label="Expected R(a0)")
-        ax4.axhline(expected_payoff_a1, linestyle="--", color='black', alpha=0.5, label="Expected R(a1)")
-        '''
-    ax4.set_xlabel('Step')
-    ax4.set_ylabel('Q-value')
-    ax4.set_title(f'95% Conf. Interval {agent1_type} Q-Values Over {len(results.keys())} Runs')
-    ax4.legend()
+            ax4.set_yticks([])
+            ax4.set_xlabel("Action")
+            ax4.set_title(f"{agent1_type} Q-Value Heatmap (Final Step)")
 
-    # 5. Q value convergence - Player 2
+            ax4.set_xticks(np.arange(5))
+            ax4.set_xticklabels(np.arange(1, 6))
+
+            plt.colorbar(im, ax=ax4)
+
+    ax4.invert_yaxis()
+
+    # 5. Q value heatmap - Player 2
     ax5 = plt.subplot(3, 3, 5)
 
     if len(results["0"]['q_values2']) > 0:
@@ -194,50 +210,58 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
         for idx in range(len(results.keys())):
             q_values2 = np.stack(results[f"{idx}"]['q_values2'])
             q_values_p2.append(q_values2)
-            
+
         q_values_p2 = np.stack(q_values_p2)
 
-        mean_q_p2 = np.mean(q_values_p2, axis=0)
-        se_q_p2 = np.std(q_values_p2, axis=0) / np.sqrt(num_experiments)
+        # mean over runs
+        mean_q_p2 = np.mean(q_values_p2, axis=0)  # shape: [time, ...]
 
-        x = np.arange(len(mean_q_p2))
+        # collapse time (use final step OR average over time)
+        final_q = mean_q_p2[-1]
 
         if agent2_type == "LH":
-            ax5.plot(mean_q_p2[:, 0, 0], label='a=0, a_-i=0')
-            ax5.plot(mean_q_p2[:, 1, 0], label='a=1, a_-i=0')
-            ax5.plot(mean_q_p2[:, 0, 1], label='a=0, a_-i=1')
-            ax5.plot(mean_q_p2[:, 1, 1], label='a=1, a_-i=1')
+            im = ax5.imshow(final_q, aspect='auto')
 
-            ax5.fill_between(x, mean_q_p2[:, 0, 0] + 1.96 * se_q_p2[:, 0, 0], mean_q_p2[:, 0, 0] - 1.96 * se_q_p2[:, 0, 0], alpha=0.3)
-            ax5.fill_between(x, mean_q_p2[:, 1, 0] + 1.96 * se_q_p2[:, 1, 0], mean_q_p2[:, 1, 0] - 1.96 * se_q_p2[:, 1, 0], alpha=0.3)
-            ax5.fill_between(x, mean_q_p2[:, 0, 1] + 1.96 * se_q_p2[:, 0, 1], mean_q_p2[:, 0, 1] - 1.96 * se_q_p2[:, 0, 1], alpha=0.3)
-            ax5.fill_between(x, mean_q_p2[:, 1, 1] + 1.96 * se_q_p2[:, 1, 1], mean_q_p2[:, 1, 1] - 1.96 * se_q_p2[:, 1, 1], alpha=0.3)
+            # annotate cells
+            for i in range(final_q.shape[0]):
+                for j in range(final_q.shape[1]):
+                    ax5.text(j, i, f"{final_q[i, j]:.2f}",
+                             ha='center', va='center', color='white')
+
+            ax5.set_xlabel("Opponent Action (a_-i)")
+            ax5.set_ylabel("Agent Action (a)")
+            ax5.set_title(f"{agent2_type} Q-Value Heatmap (Final Step)")
+
+            ax5.set_xticks(np.arange(5))
+            ax5.set_yticks(np.arange(5))
+
+            ax5.set_xticklabels(np.arange(1, 6))
+            ax5.set_yticklabels(np.arange(1, 6))
+
+            plt.colorbar(im, ax=ax5)
+
         else:
-            ax5.plot(mean_q_p2[:, 0], label='a=0')
-            ax5.plot(mean_q_p2[:, 1], label='a=1')
+            final_q = final_q.reshape(1, -1)
 
-            ax5.fill_between(x, mean_q_p2[:, 0] + 1.96 * se_q_p2[:, 0], mean_q_p2[:, 0] - 1.96 * se_q_p2[:, 0], alpha=0.3)
-            ax5.fill_between(x, mean_q_p2[:, 1] + 1.96 * se_q_p2[:, 1], mean_q_p2[:, 1] - 1.96 * se_q_p2[:, 1], alpha=0.3)
+            im = ax5.imshow(final_q, aspect='auto')
 
-        '''
-        opp_freq = mean_joint_actions.sum(axis=0) / mean_joint_actions.sum()
-        expected_payoff_a0 = payoff_matrix[:, 0, 1] @ opp_freq
-        expected_payoff_a1 = payoff_matrix[:, 1, 1] @ opp_freq
-        ax5.axhline(expected_payoff_a0, linestyle="--", color='gray', alpha=0.5, label="Expected R(a0)")
-        ax5.axhline(expected_payoff_a1, linestyle="--", color='black', alpha=0.5, label="Expected R(a1)")
-        '''
+            for j in range(final_q.shape[1]):
+                ax5.text(j, 0, f"{final_q[0, j]:.2f}",
+                         ha='center', va='center', color='white')
 
-    ax5.set_xlabel('Step')
-    ax5.set_ylabel('Q-value')
-    ax5.set_title(f'95% Conf. Interval {agent2_type} Q-Values Over {len(results.keys())} Runs')
-    ax5.legend()
+            ax5.set_xticks(np.arange(5))
+            ax5.set_xticklabels(np.arange(1, 6))
+
+            ax5.set_yticks([])
+            ax5.set_xlabel("Action")
+            ax5.set_title(f"{agent2_type} Q-Value Heatmap (Final Step)")
+
+            plt.colorbar(im, ax=ax5)
+
+    ax5.invert_yaxis()
 
     # 6. Learning convergence (how much are q values changing)
     ax6 = plt.subplot(3, 3, 6)
-    if game_name != 'Double Auction Game':
-        k = 100
-    else:
-        k = 1
 
     if len(results["0"]['q_values1']) > 0:
         q_changes_p1 = []
@@ -292,72 +316,142 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
 
     num_experiments = len(results.keys())
 
-    all_plot_1 = {}
-    all_plot_2 = {}
+    bid_runs = []
+    ask_runs = []
+    realized_price_runs = []
+    trade_rate_runs = []
 
     for exp_idx in range(num_experiments):
         exp = results[str(exp_idx)]
-        actions_1, actions_2 = exp['actions1'], exp['actions2']
-        assert len(actions_1) == len(actions_2)
 
-        plot_1, plot_2 = {}, {}
-        for idx in range(len(actions_1)):
-            ep_actions_1, ep_actions_2 = Counter(actions_1[idx]), Counter(actions_2[idx])
+        bids_by_episode = exp['actions1']
+        asks_by_episode = exp['actions2']
 
-            for key, v in plot_1.items():
-                v.append(0)
-            for key, v in plot_2.items():
-                v.append(0)
+        num_episodes = min(len(bids_by_episode), len(asks_by_episode))
 
-            for action, count in ep_actions_1.items():
-                prob = count / len(actions_1[idx])
-                if str(action) not in plot_1:
-                    plot_1[str(action)] = [0] * (idx + 1)
-                plot_1[str(action)][idx] = prob
+        episode_bid_means = []
+        episode_ask_means = []
+        episode_realized_means = []
+        episode_trade_rates = []
 
-            for action, count in ep_actions_2.items():
-                prob = count / len(actions_2[idx])
-                if str(action) not in plot_2:
-                    plot_2[str(action)] = [0] * (idx + 1)
-                plot_2[str(action)][idx] = prob
+        for ep_idx in range(num_episodes):
+            ep_bids = np.array(bids_by_episode[ep_idx], dtype=float)
+            ep_asks = np.array(asks_by_episode[ep_idx], dtype=float)
 
-        for action, curve in plot_1.items():
-            if action not in all_plot_1:
-                all_plot_1[action] = []
-            all_plot_1[action].append(curve)
+            num_steps = min(len(ep_bids), len(ep_asks))
 
-        for action, curve in plot_2.items():
-            if action not in all_plot_2:
-                all_plot_2[action] = []
-            all_plot_2[action].append(curve)
+            # mean bid / ask
+            episode_bid_means.append(np.mean(ep_bids) if len(ep_bids) > 0 else np.nan)
+            episode_ask_means.append(np.mean(ep_asks) if len(ep_asks) > 0 else np.nan)
 
-    first_exp = results["0"]
-    num_episodes = len(first_exp['actions1'])
-    window = num_episodes // 20
-    x_labels = range(window - 1, num_episodes)
+            if num_steps > 0:
+                bids = ep_bids[:num_steps]
+                asks = ep_asks[:num_steps]
 
-    if '0' in all_plot_1:
-        curves = all_plot_1['0']
-        smoothed = np.array([smooth(c, window) for c in curves])
-        mean_curve = smoothed.mean(axis=0)
-        se = smoothed.std(axis=0) / np.sqrt(num_experiments)
-        ax7.plot(x_labels, mean_curve, label=f'{agent1_type} Action 0')
-        ax7.fill_between(x_labels, mean_curve - 1.96 * se, mean_curve + 1.96 * se, alpha=0.3)
+                trade_mask = bids >= asks
 
-    if '0' in all_plot_2:
-        curves = all_plot_2['0']
-        smoothed = np.array([smooth(c, window) for c in curves])
-        mean_curve = smoothed.mean(axis=0)
-        se = smoothed.std(axis=0) / np.sqrt(num_experiments)
-        ax7.plot(x_labels, mean_curve, label=f'{agent2_type} Action 0')
-        ax7.fill_between(x_labels, mean_curve - 1.96 * se, mean_curve + 1.96 * se, alpha=0.3)
+                # trade rate
+                episode_trade_rates.append(np.mean(trade_mask))
 
-    ax7.set_title(f"Action 0 Policy Over Time\n{agent1_type} vs {agent2_type}")
+                # realized price
+                if np.any(trade_mask):
+                    realized_prices = (bids[trade_mask] + asks[trade_mask]) / 2.0
+                    episode_realized_means.append(np.mean(realized_prices))
+                else:
+                    episode_realized_means.append(np.nan)
+            else:
+                episode_trade_rates.append(np.nan)
+                episode_realized_means.append(np.nan)
+
+        bid_runs.append(episode_bid_means)
+        ask_runs.append(episode_ask_means)
+        realized_price_runs.append(episode_realized_means)
+        trade_rate_runs.append(episode_trade_rates)
+
+    bid_runs = np.array(bid_runs, dtype=float)
+    ask_runs = np.array(ask_runs, dtype=float)
+    realized_price_runs = np.array(realized_price_runs, dtype=float)
+    trade_rate_runs = np.array(trade_rate_runs, dtype=float)
+
+    window = max(1, bid_runs.shape[1] // 20)
+
+    def smooth_nan(x, w):
+        return np.array([
+            np.nanmean(x[i - w + 1:i + 1]) if not np.all(np.isnan(x[i - w + 1:i + 1])) else np.nan
+            for i in range(w - 1, len(x))
+        ])
+
+    smoothed_bids = np.array([smooth_nan(run, window) for run in bid_runs])
+    smoothed_asks = np.array([smooth_nan(run, window) for run in ask_runs])
+    smoothed_prices = np.array([smooth_nan(run, window) for run in realized_price_runs])
+    smoothed_trade = np.array([smooth_nan(run, window) for run in trade_rate_runs])
+
+    # means
+    mean_bids = np.nanmean(smoothed_bids, axis=0)
+    mean_asks = np.nanmean(smoothed_asks, axis=0)
+    mean_prices = np.nanmean(smoothed_prices, axis=0)
+    mean_trade = np.nanmean(smoothed_trade, axis=0)
+
+    # standard errors
+    se_bids = np.nanstd(smoothed_bids, axis=0) / np.sqrt(num_experiments)
+    se_asks = np.nanstd(smoothed_asks, axis=0) / np.sqrt(num_experiments)
+    se_prices = np.nanstd(smoothed_prices, axis=0) / np.sqrt(num_experiments)
+    se_trade = np.nanstd(smoothed_trade, axis=0) / np.sqrt(num_experiments)
+
+    x = np.arange(len(mean_bids))
+
+    # --- PRICE AXIS ---
+    ax7.plot(x, mean_bids, linewidth=2, label='Mean Bid')
+    ax7.fill_between(x, mean_bids + 1.96 * se_bids, mean_bids - 1.96 * se_bids, alpha=0.25)
+
+    ax7.plot(x, mean_asks, linewidth=2, label='Mean Ask')
+    ax7.fill_between(x, mean_asks + 1.96 * se_asks, mean_asks - 1.96 * se_asks, alpha=0.25)
+
+    ax7.plot(x, mean_prices, linewidth=2, label='Mean Price')
+    ax7.fill_between(x, mean_prices + 1.96 * se_prices, mean_prices - 1.96 * se_prices, alpha=0.25)
+
+    ax7.set_title("Bids, Asks, Realized Price, and Trade Rate Over Time")
     ax7.set_xlabel("Episodes")
-    ax7.set_ylabel("Action 0 Probability")
-    ax7.legend()
+    ax7.set_ylabel("Price")
     ax7.grid(True, alpha=0.3)
 
+    # --- TRADE RATE AXIS ---
+    ax7b = ax7.twinx()
+
+    ax7b.plot(
+        x,
+        mean_trade,
+        linestyle='--',
+        linewidth=1.5,
+        alpha=0.6,
+        label='Trade Rate'
+    )
+    ax7b.fill_between(
+        x,
+        mean_trade + 1.96 * se_trade,
+        mean_trade - 1.96 * se_trade,
+        alpha=0.08  # ↓ lower opacity (less visual dominance)
+    )
+
+    ax7b.set_ylabel("Trade Rate")
+    ax7b.set_ylim(0, 1)
+
+    # --- COMBINED LEGEND ---
+    lines, labels = ax7.get_legend_handles_labels()
+    lines2, labels2 = ax7b.get_legend_handles_labels()
+
+    ax7.legend(
+        lines + lines2,
+        labels + labels2,
+        loc='upper left',
+        fontsize=8,
+        framealpha=0.6,
+        handlelength=1.5,
+        labelspacing=0.3,
+        borderpad=0.3
+    )
+
+    # Exploitation Graphs
     ax8 = plt.subplot(3, 3, 8)
     ax9 = plt.subplot(3, 3, 9)
 
@@ -404,7 +498,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
 
     #plt.show()
 
-def compare_all_results(all_results, game_name, state_history, num_experiments, ref_type, payoff_table):
+def compare_all_da_results(all_results, game_name, state_history, num_experiments, ref_type, payoff_table):
     """Compare performance across all matchups using the last 50 episodes of each run.
 
     Assumes:
@@ -421,6 +515,21 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
 
     path = Path(DIR_PATH) / f"game_{game_name}" / f"sh_{state_history}"
     path.mkdir(parents=True, exist_ok=True)
+
+    fig = plt.figure(figsize=(18, 11))
+    gs = fig.add_gridspec(
+        2, 4,
+    )
+
+
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1:3])   # spans two columns
+    ax3 = fig.add_subplot(gs[0, 3])
+
+    ax4 = fig.add_subplot(gs[1, 0])
+    ax5 = fig.add_subplot(gs[1, 1])
+    ax6 = fig.add_subplot(gs[1, 2])
+    ax7 = fig.add_subplot(gs[1, 3])
 
     comparison_data = []
     last_n = 50
@@ -481,8 +590,6 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     print("\nPerformance Comparison (mean of last 50 episodes across runs):")
     print(df.to_string(index=False))
 
-    fig, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8)) = plt.subplots(2, 4, figsize=(20, 12))
-
     # ------------------------------------------------------------------
     # Bar plot of average rewards with 95% CI
     # ------------------------------------------------------------------
@@ -527,16 +634,12 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ######################################
 
     last_n = 50
-
     policy_rows = []
+    max_actions = 0
 
     for matchup_key, data in all_results.items():
-        run_probs = {
-            "P1_A0": [],
-            "P1_A1": [],
-            "P2_A0": [],
-            "P2_A1": [],
-        }
+        p1_runs = []
+        p2_runs = []
 
         for run_id, exp in data.items():
             actions_1 = exp["actions1"]
@@ -557,72 +660,118 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
             total1 = sum(c1.values())
             total2 = sum(c2.values())
 
-            run_probs["P1_A0"].append(c1.get(0, 0) / total1)
-            run_probs["P1_A1"].append(c1.get(1, 0) / total1)
-            run_probs["P2_A0"].append(c2.get(0, 0) / total2)
-            run_probs["P2_A1"].append(c2.get(1, 0) / total2)
+            n1 = max(c1.keys()) + 1
+            n2 = max(c2.keys()) + 1
+            max_actions = max(max_actions, n1, n2)
 
-        if len(run_probs["P1_A0"]) == 0:
+            probs1 = np.array([c1.get(a, 0) / total1 for a in range(n1)])
+            probs2 = np.array([c2.get(a, 0) / total2 for a in range(n2)])
+
+            p1_runs.append(probs1)
+            p2_runs.append(probs2)
+
+        if len(p1_runs) == 0:
             continue
 
-        row = {"Matchup": matchup_key}
-        for key, vals in run_probs.items():
-            arr = np.asarray(vals, dtype=float)
-            row[f"{key}_Mean"] = arr.mean()
-            row[f"{key}_CI"] = 1.96 * arr.std(ddof=1) / np.sqrt(len(arr)) if len(arr) > 1 else 0.0
+        policy_rows.append({
+            "matchup": matchup_key,
+            "p1_runs": p1_runs,
+            "p2_runs": p2_runs
+        })
 
-        policy_rows.append(row)
+    matchups = [row["matchup"] for row in policy_rows]
+    num_matchups = len(matchups)
 
-    policy_df = pd.DataFrame(policy_rows)
+    # --- build combined matrix ---
+    combined = np.zeros((max_actions, num_matchups * 2))
 
-    matchups = policy_df["Matchup"].tolist()
-    x = np.arange(len(matchups))
-    width = 0.18
+    for j, row in enumerate(policy_rows):
+        padded_p1 = []
+        for arr in row["p1_runs"]:
+            tmp = np.zeros(max_actions)
+            tmp[:len(arr)] = arr
+            padded_p1.append(tmp)
+        mean_p1 = np.mean(padded_p1, axis=0)
 
-    ax2.bar(
-        x - 1.5 * width,
-        policy_df["P1_A0_Mean"],
-        width,
-        yerr=policy_df["P1_A0_CI"],
-        capsize=4,
-        label="Player 1: Action 0",
-        alpha=0.8,
-    )
-    ax2.bar(
-        x - 0.5 * width,
-        policy_df["P1_A1_Mean"],
-        width,
-        yerr=policy_df["P1_A1_CI"],
-        capsize=4,
-        label="Player 1: Action 1",
-        alpha=0.8,
-    )
-    ax2.bar(
-        x + 0.5 * width,
-        policy_df["P2_A0_Mean"],
-        width,
-        yerr=policy_df["P2_A0_CI"],
-        capsize=4,
-        label="Player 2: Action 0",
-        alpha=0.8,
-    )
-    ax2.bar(
-        x + 1.5 * width,
-        policy_df["P2_A1_Mean"],
-        width,
-        yerr=policy_df["P2_A1_CI"],
-        capsize=4,
-        label="Player 2: Action 1",
-        alpha=0.8,
+        padded_p2 = []
+        for arr in row["p2_runs"]:
+            tmp = np.zeros(max_actions)
+            tmp[:len(arr)] = arr
+            padded_p2.append(tmp)
+        mean_p2 = np.mean(padded_p2, axis=0)
+
+        combined[:, 2*j] = mean_p1   # buyer
+        combined[:, 2*j + 1] = mean_p2  # seller
+
+    
+
+    im = ax2.imshow(
+        combined,
+        aspect='auto',
+        origin='lower',
+        interpolation='nearest'
     )
 
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(matchups, rotation=45, ha="right")
-    ax2.set_ylabel("Final Action Probability")
-    ax2.set_xlabel("Matchup")
-    ax2.set_title(f"Converged Policy Distribution by Matchup")
-    ax2.legend()
-    ax2.grid(True, alpha=0.3, axis="y")
+    # --- x labels ---
+    xticks = []
+    xticklabels = []
+
+    for j, m in enumerate(matchups):
+        left, right = m.split("_vs_")
+
+        xticks.extend([2*j, 2*j + 1])
+        xticklabels.extend([
+            f"{left} (B)",
+            f"{right} (S)"
+        ])
+
+    ax2.set_xticks(xticks)
+    ax2.set_xticklabels(xticklabels, rotation=45, ha="right")
+
+    # --- y labels ---
+    ax2.set_yticks(np.arange(max_actions))
+    ax2.set_yticklabels(np.arange(1, max_actions + 1))
+
+    ax2.set_title("Final Policies (Buyer vs Seller)")
+    ax2.set_xlabel("Matchup / Agent")
+    ax2.set_ylabel("Action")
+
+    # --- vertical separators between matchups ---
+    for j in range(num_matchups - 1):
+        ax2.axvline(2*j + 1.5, color='white', linewidth=2)
+
+    # --- annotate (optional) ---
+    for i in range(combined.shape[0]):
+        for j in range(combined.shape[1]):
+            val = combined[i, j]
+            ax2.text(
+                j,
+                i,
+                f"{val:.2f}",
+                ha='center',
+                va='center',
+                fontsize=7,
+                color='white' if val > 0.5 else 'black'
+            )
+
+    ax2.set_anchor('C')
+    ax2.margins(0)
+    # tighten image bounds
+    ax2.set_xlim(-0.5, combined.shape[1] - 0.5)
+    ax2.set_ylim(-0.5, combined.shape[0] - 0.5)
+
+    # now attach colorbar relative to final axis
+    # cbar = fig.colorbar(im, ax=ax2, fraction=0.025, pad=0.01)
+    #cbar.set_label("Probability")
+
+    # shrink axis width
+    box = ax2.get_position()
+    ax2.set_position([
+        box.x0,
+        box.y0,
+        box.width * 0.5,   # slightly stronger shrink
+        box.height
+    ])
 
     # CPT Transformation Action Change Rate
 
@@ -892,10 +1041,10 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     last_n = 50
     exploit_data = []
 
-    # 2x2x2 payoff array:
-    # payoffs[a1, a2, 0] = player 1 reward
-    # payoffs[a1, a2, 1] = player 2 reward
-    payoffs = payoff_table[game_name]['payoffs']
+    # payoffs[a1, a2, 0] = buyer / agent 1 reward
+    # payoffs[a1, a2, 1] = seller / agent 2 reward
+    payoffs = payoff_table
+    num_actions = payoffs.shape[0]
 
     for matchup_key, data in all_results.items():
         run_exploit1 = []
@@ -911,8 +1060,6 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
             flat_1 = [a for ep in last_actions_1 for a in ep]
             flat_2 = [a for ep in last_actions_2 for a in ep]
 
-            print(len(flat_1), len(flat_2))
-
             if len(flat_1) == 0 or len(flat_2) == 0:
                 continue
 
@@ -922,43 +1069,27 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
             total1 = sum(c1.values())
             total2 = sum(c2.values())
 
-            # Empirical mixed strategies
-            p1 = np.array([
-                c1.get(0, 0) / total1,
-                c1.get(1, 0) / total1
-            ], dtype=float)
+            # empirical mixed strategies over n actions
+            p1 = np.array([c1.get(a, 0) / total1 for a in range(num_actions)], dtype=float)
+            p2 = np.array([c2.get(a, 0) / total2 for a in range(num_actions)], dtype=float)
 
-            p2 = np.array([
-                c2.get(0, 0) / total2,
-                c2.get(1, 0) / total2
-            ], dtype=float)
+            # actual expected rewards under empirical mixed play
+            # actual_p1 = sum_{a1,a2} p1[a1] p2[a2] payoffs[a1,a2,0]
+            # actual_p2 = sum_{a1,a2} p1[a1] p2[a2] payoffs[a1,a2,1]
+            actual_p1 = p1 @ payoffs[:, :, 0] @ p2
+            actual_p2 = p1 @ payoffs[:, :, 1] @ p2
 
-            # Actual expected rewards under empirical mixed play
-            actual_p1 = 0.0
-            actual_p2 = 0.0
-            for a1 in range(2):
-                for a2 in range(2):
-                    prob = p1[a1] * p2[a2]
-                    actual_p1 += prob * payoffs[a1, a2, 0]
-                    actual_p2 += prob * payoffs[a1, a2, 1]
+            # best-response value for player 1 against p2
+            # for each buyer action a1:
+            # br_val[a1] = sum_{a2} p2[a2] payoffs[a1,a2,0]
+            br_vals_p1 = payoffs[:, :, 0] @ p2
+            br_p1 = np.max(br_vals_p1)
 
-            # Best response value for player 1 against p2
-            br_vals_p1 = []
-            for a1 in range(2):
-                val = 0.0
-                for a2 in range(2):
-                    val += p2[a2] * payoffs[a1, a2, 0]
-                br_vals_p1.append(val)
-            br_p1 = max(br_vals_p1)
-
-            # Best response value for player 2 against p1
-            br_vals_p2 = []
-            for a2 in range(2):
-                val = 0.0
-                for a1 in range(2):
-                    val += p1[a1] * payoffs[a1, a2, 1]
-                br_vals_p2.append(val)
-            br_p2 = max(br_vals_p2)
+            # best-response value for player 2 against p1
+            # for each seller action a2:
+            # br_val[a2] = sum_{a1} p1[a1] payoffs[a1,a2,1]
+            br_vals_p2 = p1 @ payoffs[:, :, 1]
+            br_p2 = np.max(br_vals_p2)
 
             exploit1 = br_p1 - actual_p1
             exploit2 = br_p2 - actual_p2
@@ -989,7 +1120,7 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     x = np.arange(len(exploit_df["Matchup"]))
 
     ax6.bar(
-        x - width/2,
+        x - width / 2,
         exploit_df["Agent1_Exploit"],
         width,
         yerr=exploit_df["Agent1_CI"],
@@ -999,7 +1130,7 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     )
 
     ax6.bar(
-        x + width/2,
+        x + width / 2,
         exploit_df["Agent2_Exploit"],
         width,
         yerr=exploit_df["Agent2_CI"],
@@ -1016,7 +1147,6 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ax6.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
     ax6.legend()
     ax6.grid(True, alpha=0.3, axis="y")
-
 
     exploit_data = []
 
@@ -1071,8 +1201,6 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     ax7.legend()
     ax7.grid(True, alpha=0.3, axis="y")
 
-    ax8.axis('off')
-
 
     fig.suptitle(f"{game_name} — Learning Results Across Matchups - Last {last_n} Episodes", fontsize=16)
 
@@ -1082,6 +1210,21 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     hspace=0.45,
     wspace=0.30
     )   
+
+    # shrink axis width
+    box = ax2.get_position()
+    ax2.set_position([
+        box.x0,
+        box.y0,
+        box.width * 0.85,   # slightly stronger shrink
+        box.height
+    ])
+
+    # create colorbar axis based on final heatmap position
+    box = ax2.get_position()
+    cax = fig.add_axes([box.x1 + 0.01, box.y0, 0.012, box.height])
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_label("Probability")
 
     #plt.show()
 

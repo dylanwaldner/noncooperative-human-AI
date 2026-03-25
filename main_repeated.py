@@ -7,6 +7,7 @@ warnings.filterwarnings('ignore')
 import pandas as pd
 from repeated_games.train import run_complete_experiment, train_agents 
 from repeated_games.analyze import compare_all_results
+from repeated_games.da_analyze import compare_all_da_results
 
 from repeated_games import (
     RepeatedGameEnv,
@@ -290,6 +291,7 @@ def interactive_experiment():
             state_histories = [0, 2] 
             for state_history in state_histories: 
                 env = DoubleAuction(k=price_range, valuation=valuation, cost=cost, horizon=100, state_history=state_history)
+                payoff_matrix = env.build_payoff_matrix()
                 ref_settings = ["Fixed", "EMA", "V", "EMAOR"] 
                 for ref_setting in ref_settings: 
                     # FOr double auction player 1 is the buyer, player 2 is the seller
@@ -306,7 +308,8 @@ def interactive_experiment():
                     all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments, action_size=price_range) 
 
                     # Compare results 
-                    data = compare_all_results(all_results, game_name, state_history, num_experiments, ref_setting, games) 
+                  
+                    data = compare_all_da_results(all_results, game_name, state_history, num_experiments, ref_setting, payoff_matrix) 
 
 
 

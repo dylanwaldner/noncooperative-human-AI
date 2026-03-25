@@ -5,6 +5,7 @@ from .ai_agent import AIAgent
 from .game_env import RepeatedGameEnv 
 from .utils import get_all_games
 from .analyze import analyze_matchup
+from .da_analyze import analyze_matchup_da
 import numpy as np
 import pandas as pd
 import time
@@ -481,8 +482,11 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         all_results[matchup_key] = results
 
         # Analyze this matchup
-        games_dict = get_all_games()
-        analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_setting, env)
+        if game_name != 'Double Auction Game':
+            games_dict = get_all_games()
+            analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_setting, env)
+        else:
+            analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matrix, pt_params, ref_setting, env)
 
     return all_results
 

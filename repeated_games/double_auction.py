@@ -1,4 +1,5 @@
 import numpy as np
+import time
 # Double Auction Game
 class DoubleAuction:
   '''
@@ -12,6 +13,7 @@ class DoubleAuction:
     self.A = set(range(1, k+1))
     self.B = set(range(1, k+1))
     self.k = k
+    print("k: ", self.k)
 
     self.valuation = valuation
     self.cost = cost
@@ -19,6 +21,7 @@ class DoubleAuction:
     self.history = []
     self.state_history = state_history
     self.state_size = (self.k**2) ** self.state_history
+    print("in state size: ", self.state_size)
     self.round = 0
 
     self.horizon = horizon
@@ -40,9 +43,6 @@ class DoubleAuction:
         else:
           payoff_matrix[i, j] = (0, 0)
 
-    with np.printoptions(threshold=np.inf):
-        print(payoff_matrix)
-
     return payoff_matrix
 
   def reset(self):
@@ -50,22 +50,18 @@ class DoubleAuction:
     return self._get_state()
 
   def _get_state(self):
-    '''
-    Part of the problem with the double auction game is the way states explode, causing memory problems. 
-    Maybe there's a better way to handle this? Games are also converging on just a few states, predictably. 
-    '''
-
+    if self.state_history == 0:
+        return 0
+    base = self.k * self.k
     state = 0
-    for i in range(len(self.history)):
-        if i < self.state_history:
-            a1, a2 = self.history[-(i+1)]
-            pair = (a1-1) * self.k + (a2-1)
-        else:
-            pair = 0
- 
-        state += pair * ((self.k ** 2) ** i) 
 
-    return int(state)
+    recent = self.history[-self.state_history:]
+
+    for i, (a1, a2) in enumerate(reversed(recent)):
+        pair = (a1 - 1) * self.k + (a2 - 1)
+        state += pair * (base ** i)
+
+    return state
 
   def step(self, bid, ask):
     # The actions are 0 indexed, bids and asks are 1 indexed
@@ -73,11 +69,10 @@ class DoubleAuction:
     ask += 1
 
     assert bid in self.B and ask in self.A, f"bid: {bid}, ask: {ask}"
-  
+
     self.history.append((bid, ask))
     self.history = self.history[-self.state_history:]
     self.round += 1
-
     done = self.round >= self.horizon
 
     # If a successful trade
@@ -85,6 +80,7 @@ class DoubleAuction:
       price = (bid + ask) / 2 # midpoint pricing
       buyer_payoff = self.valuation - price # how good a buy
       seller_payoff = price - self.cost # profit
+
       return self._get_state(), buyer_payoff, seller_payoff, done, {}
 
     else:

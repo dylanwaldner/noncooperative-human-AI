@@ -305,7 +305,7 @@ def interactive_experiment():
                     print(f"\nStarting complete experiment for {game_name}...") 
                     # Store results 
                     print(f"\nStarting complete experiment for {game_name}...") 
-                    all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments, action_size=price_range) 
+                    all_results = run_complete_experiment(game_name, payoff_matrix, episodes=episodes, ref_setting=ref_setting, pt_params=pt_params, ref_point=r, state_history=state_history, num_experiments=num_experiments, action_size=price_range, env=env) 
 
                     # Compare results 
                   

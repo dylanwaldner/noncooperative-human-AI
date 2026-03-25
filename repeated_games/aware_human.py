@@ -137,16 +137,13 @@ class AwareHumanPTAgent:
         # To track the effect of CPT Transformation
         EU_best_vals = np.zeros(self.action_size)
 
-        for i in range(self.action_size):
-            # Use precalculated opp response
-            opp_response = opp_best_responses[i]
-            value = matrix[i, opp_response, self.agent_id] # agent id indexes row/col
-            EU_best_vals[i] = value # EU
-            # Always PT transforming here — it is degenerate so no need for full lottery (please confirm this)
-            # My thinking is that we are not randomizing over our actions ever, and now we have certainty
-            # over the opp action, so probabilities are degenerate and value transform is all that matters
-            value = self.pt.value_function(value)
-            best_vals[i] = value
+        # Use precalculated opp response
+        # Always PT transforming here — it is degenerate so no need for full lottery (please confirm this)
+        # My thinking is that we are not randomizing over our actions ever, and now we have certainty
+        # over the opp action, so probabilities are degenerate and value transform is all that matters
+        idx = np.arange(self.action_size)
+        EU_best_vals = matrix[idx, opp_best_responses, self.agent_id]
+        best_vals = self.pt.value_function(EU_best_vals)
 
         pt_l2_dist = np.linalg.norm(best_vals - EU_best_vals)
         self.pt_l2_dists.append(pt_l2_dist)

@@ -14,11 +14,14 @@ class ProspectTheory:
         """PT value function v(x)"""
         # I chose to handle the reference point subtraction in the method to prevent the need for tracking the correct
         # reference point in the training loop, seemed more modular and self contained this way
-        x = x - self.r
-        if x >= 0:
-            return (x + 1e-10) ** self.alpha
-        else:
-            return -self.lambd * ((-x + 1e-10) ** self.alpha)
+        x = np.asarray(x) - self.r
+
+        eps = 1e-10
+
+        gains = (x + eps) ** self.alpha
+        losses = -self.lambd * ((-x + eps) ** self.alpha)
+
+        return np.where(x >= 0, gains, losses)
 
     def w_plus(self, p):
         if p <= 0.0:

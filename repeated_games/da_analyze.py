@@ -318,6 +318,8 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
 
     bid_runs = []
     ask_runs = []
+    traded_bid_runs = []
+    traded_ask_runs = []
     realized_price_runs = []
     trade_rate_runs = []
 
@@ -333,6 +335,9 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
         episode_ask_means = []
         episode_realized_means = []
         episode_trade_rates = []
+ 
+        episode_traded_bid_means = []
+        episode_traded_ask_means = []
 
         for ep_idx in range(num_episodes):
             ep_bids = np.array(bids_by_episode[ep_idx], dtype=float)
@@ -341,12 +346,12 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
             num_steps = min(len(ep_bids), len(ep_asks))
 
             # mean bid / ask
-            episode_bid_means.append(np.mean(ep_bids) if len(ep_bids) > 0 else np.nan)
-            episode_ask_means.append(np.mean(ep_asks) if len(ep_asks) > 0 else np.nan)
+            episode_bid_means.append(np.mean(ep_bids + 1) if len(ep_bids) > 0 else np.nan)
+            episode_ask_means.append(np.mean(ep_asks + 1) if len(ep_asks) > 0 else np.nan)
 
             if num_steps > 0:
-                bids = ep_bids[:num_steps]
-                asks = ep_asks[:num_steps]
+                bids = ep_bids[:num_steps] + 1
+                asks = ep_asks[:num_steps] + 1
 
                 trade_mask = bids >= asks
 
@@ -355,11 +360,25 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
 
                 # realized price
                 if np.any(trade_mask):
+                    mean_bid_trade = np.mean(bids[trade_mask])
+                    mean_ask_trade = np.mean(asks[trade_mask])
+                    mean_price_trade = np.mean((bids[trade_mask] + asks[trade_mask]) / 2)
+
+                    if not (mean_ask_trade <= mean_price_trade <= mean_bid_trade):
+                        print("ANOMALY:", "Ask: ", mean_ask_trade, "Bid: ", mean_bid_trade, "Trade: ", mean_price_trade)
+
                     realized_prices = (bids[trade_mask] + asks[trade_mask]) / 2.0
+
+                    episode_traded_bid_means.append(mean_bid_trade)
+                    episode_traded_ask_means.append(mean_ask_trade)
                     episode_realized_means.append(np.mean(realized_prices))
                 else:
+                    episode_traded_bid_means.append(np.nan)
+                    episode_traded_ask_means.append(np.nan)
                     episode_realized_means.append(np.nan)
             else:
+                episode_traded_bid_means.append(np.nan)
+                episode_traded_ask_means.append(np.nan)
                 episode_trade_rates.append(np.nan)
                 episode_realized_means.append(np.nan)
 
@@ -367,6 +386,8 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
         ask_runs.append(episode_ask_means)
         realized_price_runs.append(episode_realized_means)
         trade_rate_runs.append(episode_trade_rates)
+        traded_bid_runs.append(episode_traded_bid_means)
+        traded_ask_runs.append(episode_traded_ask_means)
 
     bid_runs = np.array(bid_runs, dtype=float)
     ask_runs = np.array(ask_runs, dtype=float)
@@ -381,6 +402,12 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
             for i in range(w - 1, len(x))
         ])
 
+    traded_bid_runs = np.array(traded_bid_runs, dtype=float)
+    traded_ask_runs = np.array(traded_ask_runs, dtype=float)
+
+    smoothed_traded_bids = np.array([smooth_nan(run, window) for run in traded_bid_runs])
+    smoothed_traded_asks = np.array([smooth_nan(run, window) for run in traded_ask_runs])
+
     smoothed_bids = np.array([smooth_nan(run, window) for run in bid_runs])
     smoothed_asks = np.array([smooth_nan(run, window) for run in ask_runs])
     smoothed_prices = np.array([smooth_nan(run, window) for run in realized_price_runs])
@@ -391,6 +418,12 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     mean_asks = np.nanmean(smoothed_asks, axis=0)
     mean_prices = np.nanmean(smoothed_prices, axis=0)
     mean_trade = np.nanmean(smoothed_trade, axis=0)
+
+    mean_traded_bids = np.nanmean(smoothed_traded_bids, axis=0)
+    mean_traded_asks = np.nanmean(smoothed_traded_asks, axis=0)
+
+    se_traded_bids = np.nanstd(smoothed_traded_bids, axis=0) / np.sqrt(num_experiments)
+    se_traded_asks = np.nanstd(smoothed_traded_asks, axis=0) / np.sqrt(num_experiments)
 
     # standard errors
     se_bids = np.nanstd(smoothed_bids, axis=0) / np.sqrt(num_experiments)
@@ -409,6 +442,17 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
 
     ax7.plot(x, mean_prices, linewidth=2, label='Mean Price')
     ax7.fill_between(x, mean_prices + 1.96 * se_prices, mean_prices - 1.96 * se_prices, alpha=0.25)
+
+    ax7.plot(x, mean_traded_bids, linestyle='--', linewidth=2, label='Traded Bid')
+    ax7.plot(x, mean_traded_asks, linestyle='--', linewidth=2, label='Traded Ask')
+
+    ax7.fill_between(x, mean_traded_bids - 1.96 * se_traded_bids,
+                     mean_traded_bids + 1.96 * se_traded_bids,
+                     alpha=0.15)
+
+    ax7.fill_between(x, mean_traded_asks - 1.96 * se_traded_asks,
+                     mean_traded_asks + 1.96 * se_traded_asks,
+                     alpha=0.15)
 
     ax7.set_title("Bids, Asks, Realized Price, and Trade Rate Over Time")
     ax7.set_xlabel("Episodes")

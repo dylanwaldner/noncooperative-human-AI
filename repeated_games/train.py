@@ -3,6 +3,7 @@ from .aware_human import AwareHumanPTAgent
 from .learning_human import LearningHumanPTAgent
 from .ai_agent import AIAgent
 from .game_env import RepeatedGameEnv 
+from .double_auction import DoubleAuction 
 from .utils import get_all_games
 from .analyze import analyze_matchup
 from .da_analyze import analyze_matchup_da
@@ -11,9 +12,21 @@ import pandas as pd
 import time
 import copy
 import random
+from pympler import asizeof
 BASE_SEED = 42
 
 from matplotlib.ticker import FuncFormatter
+
+import os
+import time
+import psutil
+
+process = psutil.Process(os.getpid())
+
+def log_perf(ep_idx, t_start):
+    rss_mb = process.memory_info().rss / 1024**2
+    elapsed = time.perf_counter() - t_start
+    print(f"Episode {ep_idx}: time={elapsed:.3f}s, RSS={rss_mb:.2f} MB")
 
 def train_agents(agent1, agent2, env, episodes=500,
                  exploration_decay=0.99, verbose=True, game_name=''):
@@ -58,7 +71,7 @@ def train_agents(agent1, agent2, env, episodes=500,
     start_time = time.time()
     last_time = start_time
 
-    log_every = 100
+    log_every = 99
     global_step = 1
 
     # Reset metrics
@@ -76,6 +89,8 @@ def train_agents(agent1, agent2, env, episodes=500,
     last_action1, last_action2 = 0, 0
 
     for episode in range(episodes):
+        t0 = time.perf_counter()
+
         state = env.reset()
         episode_rewards1 = []
         episode_rewards2 = []
@@ -121,6 +136,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                 # Agent 1 chooses action
                 action2 = agent2.act(state)
 
+
             last_action1, last_action2 = action1, action2
 
             # Execute step
@@ -150,13 +166,8 @@ def train_agents(agent1, agent2, env, episodes=500,
                 #print("Q vals in Train 1: ", q_vals)
 
                 # Tracking
-                if game_name == 'Double Auction Game':
-                    if global_step % log_every == 0:
-                        results['q_values1'].append(q_vals)
-                        results['ref_points1'].append(agent1.ref_point)
-                else:
-                    results['q_values1'].append(q_vals)
-                    results['ref_points1'].append(agent1.ref_point)
+                results['q_values1'].append(q_vals)
+                results['ref_points1'].append(agent1.ref_point)
 
                 del q_vals
 
@@ -170,18 +181,13 @@ def train_agents(agent1, agent2, env, episodes=500,
                 q_vals = np.asarray(q_vals, dtype=np.float32)
 
                 # Tracking
-                if game_name == 'Double Auction Game':
-                    if global_step % log_every == 0:
-                        results['q_values1'].append(q_vals)
-                else:
-                    results['q_values1'].append(q_vals)
+                results['q_values1'].append(q_vals)
                 
                 del q_vals
 
             else: # Aware Human
                 results['ref_points1'].append(agent1.ref_point)
                 
-
             if isinstance(agent2, LearningHumanPTAgent):
                 # Update LH variables
                 agent2.belief_update(pt_state2, action1)
@@ -194,13 +200,8 @@ def train_agents(agent1, agent2, env, episodes=500,
                 q_vals = np.asarray(q_vals, dtype=np.float32)
 
                 # Tracking
-                if game_name == 'Double Auction Game':
-                    if global_step % log_every == 0: # trying to control memory
-                        results['q_values2'].append(q_vals)
-                        results['ref_points2'].append(agent2.ref_point)
-                else:
-                    results['q_values2'].append(q_vals)
-                    results['ref_points2'].append(agent2.ref_point)
+                results['q_values2'].append(q_vals)
+                results['ref_points2'].append(agent2.ref_point)
                 del q_vals
 
             elif isinstance(agent2, AIAgent):
@@ -211,11 +212,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                 q_vals = np.asarray(q_vals, dtype=np.float32)
 
                 # Tracking
-                if game_name == 'Double Auction Game':
-                    if global_step % log_every == 0:
-                        results['q_values2'].append(q_vals)
-                else:
-                    results['q_values2'].append(q_vals)
+                results['q_values2'].append(q_vals)
 
                 del q_vals
 
@@ -224,7 +221,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 # Pass agent 1 pt func to agent2
                 if not isinstance(agent1, AIAgent):
                     agent2.opp_pt = agent1.pt
-
             # We needed agent 2 to be fully calculated before passing the agent 2 pt values to agent 1
             if isinstance(agent1, AwareHumanPTAgent):
                 if not isinstance(agent2, AIAgent):
@@ -266,6 +262,8 @@ def train_agents(agent1, agent2, env, episodes=500,
 
             if done:
                 break
+
+        #log_perf(episode, t0) print memory and time per episode
 
         # Store episode results
         print(f"\rEpisode {episode+1} of {episodes}", end='')
@@ -325,7 +323,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
     return results
 
-def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting='Fixed', pt_params={}, ref_point=0, state_history=2, num_experiments=30, action_size=2):
+def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting='Fixed', pt_params={}, ref_point=0, state_history=2, num_experiments=30, action_size=2, env=None):
     """
     Run all agent matchups for a game
     This is pretty much deprecated, I intend to run via custom game or I will edit this.
@@ -412,7 +410,10 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
             np.random.seed(seed)
             random.seed(seed)
             # Reset environment
-            env = RepeatedGameEnv(payoff_matrix, horizon=100, state_history=state_history)
+            if env is None: # 2x2 matrix game
+                env = RepeatedGameEnv(payoff_matrix, horizon=100, state_history=state_history)
+            else:
+                _ = env.reset()
 
             # Create agents based on type
             if agent1_type == 'LH':
@@ -475,7 +476,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
 
             # Train the matchup
-            results[f"{idx}"] = train_agents(agent1, agent2, env, episodes=episodes, verbose=True)
+            results[f"{idx}"] = train_agents(agent1, agent2, env, episodes=episodes, verbose=True, game_name=game_name)
 
         # Store results
         matchup_key = f"{agent1_type}_vs_{agent2_type}"

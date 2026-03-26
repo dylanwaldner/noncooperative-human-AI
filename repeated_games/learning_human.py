@@ -276,7 +276,7 @@ class LearningHumanPTAgent:
         '''The point here is to align our agent with PT-EB principles. We treat our own decision making
         as certain (so q values are in reward/outcome space), but we allot our uncertainty to opp actions.
         That is why you will see the expectation taken over opponent actions conditioned on our beliefs
-        in the boot strap. 
+        in the next state value calculation. 
         '''
         if state not in self.state_visit_counter.keys():
             self.state_visit_counter[state] = [0] * self.action_size

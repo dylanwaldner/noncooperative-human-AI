@@ -64,14 +64,15 @@ def train_agents(agent1, agent2, env, episodes=500,
         'best_responses1': [],
         'best_responses2': [],
         'best_rewards1': [], 
-        'best_rewards2': []
+        'best_rewards2': [],
+        'states': [],
     }
     joint_counts = np.zeros((agent1.action_size,agent2.action_size), dtype=int)
 
     start_time = time.time()
     last_time = start_time
 
-    log_every = 99
+    log_every = 100
     global_step = 1
 
     # Reset metrics
@@ -109,6 +110,8 @@ def train_agents(agent1, agent2, env, episodes=500,
         best_reward2 = []
 
         for _ in range(env.horizon):
+            results['states'].append(state)
+
             # We transform the PT agents states to include ref bins
             if not isinstance(agent1, AIAgent):
                 if isinstance(agent1, LearningHumanPTAgent):
@@ -406,7 +409,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
             # Reset environment
             if env is None: # 2x2 matrix game
                 env = RepeatedGameEnv(payoff_matrix, horizon=100, state_history=state_history)
-            else:
+            else: # Env passed from main_repeated, just need to reset it
                 _ = env.reset()
 
             # Create agents based on type

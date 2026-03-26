@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import json
+import gzip
 
 DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
 
@@ -493,7 +494,7 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
         borderpad=0.3
     )
 
-    # Exploitation Graphs
+    # Reward Discrepancy
     ax8 = plt.subplot(3, 3, 8)
     ax9 = plt.subplot(3, 3, 9)
 
@@ -520,8 +521,8 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     ax8.fill_between(x, mean_gap1 + 1.96*se_gap1, mean_gap1 - 1.96*se_gap1, alpha=0.3)
     ax8.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax8.set_xlabel('Step')
-    ax8.set_ylabel('Best Response Reward - Actual Reward')
-    ax8.set_title(f'{agent1_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
+    ax8.set_ylabel('BR Reward - Actual Reward')
+    ax8.set_title(f'{agent1_type} Best Reward Discrepancy\n{num_experiments} Runs')
     ax8.legend()
     ax8.grid(True, alpha=0.3)
 
@@ -529,10 +530,11 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     ax9.fill_between(x, mean_gap2 + 1.96*se_gap2, mean_gap2 - 1.96*se_gap2, alpha=0.3)
     ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax9.set_xlabel('Step')
-    ax9.set_ylabel('Best Response Reward - Actual Reward')
-    ax9.set_title(f'{agent2_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
+    ax9.set_ylabel('BR Reward - Actual Reward')
+    ax9.set_title(f'{agent2_type} Best Reward Discrepancy\n{num_experiments} Runs')
     ax9.legend()
     ax9.grid(True, alpha=0.3)
+
 
     plt.suptitle(f'{game_name}: {agent1_type} vs {agent2_type}', fontsize=16, y=1.02)
     plt.tight_layout()
@@ -1183,7 +1185,7 @@ def compare_all_da_results(all_results, game_name, state_history, num_experiment
 
     ax6.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax6.set_xlabel("Matchup")
-    ax6.set_ylabel("Best-Response Value - Policy Value")
+    ax6.set_ylabel("BR Value - Policy Value")
     ax6.set_title("Missed Exploitability by Matchup")
     ax6.set_xticks(x)
     ax6.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
@@ -1236,8 +1238,8 @@ def compare_all_da_results(all_results, game_name, state_history, num_experiment
             label="Agent 2", alpha=0.7, capsize=4)
     ax7.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax7.set_xlabel("Matchup")
-    ax7.set_ylabel("Best Response Reward - Actual Reward")
-    ax7.set_title("Exploitability Gap by Matchup")
+    ax7.set_ylabel("BR Reward - Actual Reward")
+    ax7.set_title("Reward Discrepancy by Matchup")
     ax7.set_xticks(x)
     ax7.set_xticklabels(exploit_df["Matchup"], rotation=45, ha="right")
     ax7.legend()
@@ -1273,10 +1275,22 @@ def compare_all_da_results(all_results, game_name, state_history, num_experiment
     plt.savefig(path / f"{game_name}_{ref_type}_Comparison.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    #all_results = convert(all_results)
-   
+    all_results_slice = {}
 
-    #with open(path / f"{game_name}_{ref_type}_Comparison.json", "w") as f:
-    #    json.dump(all_results, f)
+    for key, value in all_results.items():
+        all_results_slice[key] = {}
+
+        for k, v in value.items():
+            all_results_slice[key][k] = {
+            'state': v['states'],
+            'actions1': v['actions1'],
+            'actions2': v['actions2'],
+            }
+
+    all_results_slice = convert(all_results_slice)
+
+
+    with gzip.open(path / f"{game_name}_{ref_type}_StateVisits.json.gz", "wt", encoding="utf-8") as f:
+        json.dump(all_results_slice, f)
 
     return comparison_data

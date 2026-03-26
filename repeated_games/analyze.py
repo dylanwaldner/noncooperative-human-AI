@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 
 import json
+import gzip
 
 DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
 
@@ -378,8 +379,8 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     ax8.fill_between(x, mean_gap1 + 1.96*se_gap1, mean_gap1 - 1.96*se_gap1, alpha=0.3)
     ax8.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax8.set_xlabel('Step')
-    ax8.set_ylabel('Best Response Reward - Actual Reward')
-    ax8.set_title(f'{agent1_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
+    ax8.set_ylabel('BR Reward - Actual Reward')
+    ax8.set_title(f'{agent1_type} Best Reward Discrepancy\n{num_experiments} Runs')
     ax8.legend()
     ax8.grid(True, alpha=0.3)
 
@@ -387,8 +388,8 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     ax9.fill_between(x, mean_gap2 + 1.96*se_gap2, mean_gap2 - 1.96*se_gap2, alpha=0.3)
     ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax9.set_xlabel('Step')
-    ax9.set_ylabel('Best Response Reward - Actual Reward')
-    ax9.set_title(f'{agent2_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
+    ax9.set_ylabel('BR Reward - Actual Reward')
+    ax9.set_title(f'{agent2_type} Best Reward Discrepancy\n{num_experiments} Runs')
     ax9.legend()
     ax9.grid(True, alpha=0.3)
 
@@ -1082,10 +1083,21 @@ def compare_all_results(all_results, game_name, state_history, num_experiments, 
     plt.savefig(path / f"{game_name}_{ref_type}_Comparison.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    #all_results = convert(all_results)
+    all_results_slice = {}
+
+    for key, value in all_results.items():
+        all_results_slice[key] = {}
+
+        for k, v in value.items():
+            all_results_slice[key][k] = {
+            'state': v['states'],
+            'actions1': v['actions1'],
+            'actions2': v['actions2'],
+            }
+    all_results_slice = convert(all_results_slice)
    
 
-    #with open(path / f"{game_name}_{ref_type}_Comparison.json", "w") as f:
-    #    json.dump(all_results, f)
+    with gzip.open(path / f"{game_name}_{ref_type}_StateVisits.json.gz", "wt", encoding="utf-8") as f:
+        json.dump(all_results_slice, f)
 
     return comparison_data

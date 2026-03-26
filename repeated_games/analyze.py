@@ -379,7 +379,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     ax8.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax8.set_xlabel('Step')
     ax8.set_ylabel('Best Response Reward - Actual Reward')
-    ax8.set_title(f'{agent1_type} Exploitability Gap\n{num_experiments} Runs')
+    ax8.set_title(f'{agent1_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
     ax8.legend()
     ax8.grid(True, alpha=0.3)
 
@@ -388,7 +388,7 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
     ax9.axhline(y=0, color='black', linestyle='--', alpha=0.5)
     ax9.set_xlabel('Step')
     ax9.set_ylabel('Best Response Reward - Actual Reward')
-    ax9.set_title(f'{agent2_type} Exploitability Gap\n{num_experiments} Runs')
+    ax9.set_title(f'{agent2_type} Opponent Reward Discrepancy\n{num_experiments} Runs')
     ax9.legend()
     ax9.grid(True, alpha=0.3)
 

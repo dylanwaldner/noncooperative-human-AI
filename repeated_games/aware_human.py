@@ -23,14 +23,6 @@ class AwareHumanPTAgent:
 
         self.ref_update_mode = ref_setting
 
-        # We initialize the ref point at r, but then change it if the ref mode is not fixed to a BR
-        self.ref_point = pt_params['r']
-
-        self.best_response_val = None
-        self.opp_best_resp_val = None
-        _ = self.act()
-        self.set_ref_point()
-
         self.tit_for_tat = tit_for_tat
 
         self.tau = 0.1 # tie break threshold
@@ -61,6 +53,14 @@ class AwareHumanPTAgent:
 
         self.pt_l2_dists = []
         self.action_changed_flags = []
+
+        # We initialize the ref point at r, but then change it if the ref mode is not fixed to a BR
+        self.ref_point = pt_params['r']
+
+        self.best_response_val = None
+        self.opp_best_resp_val = None
+        _ = self.act()
+        self.set_ref_point()
 
     def get_opp_br(self, matrix):
         '''
@@ -171,6 +171,9 @@ class AwareHumanPTAgent:
         else:
             best_response = opt_a
 
+        if self.best_response_val is None:
+            self.best_response_val = EU_best_vals[EU_opt_a]
+
         return best_response
 
     def act(self, last_opp_action=None):
@@ -190,8 +193,6 @@ class AwareHumanPTAgent:
             # argmax the best action we can take conditioned on how the opponent will reply
             player_best_response = self.get_best_response(matrix, opp_best_responses)
 
-            if self.best_response_val is None:
-                self.best_response_val = matrix[player_best_response, opp_best_response, self.agent_id]
 
         else:
             # tit for tat

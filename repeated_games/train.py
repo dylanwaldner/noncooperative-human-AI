@@ -142,13 +142,13 @@ def train_agents(agent1, agent2, env, episodes=500,
             # Execute step
             next_state, reward1, reward2, done, _ = env.step(action1, action2)
 
-            if not isinstance(agent1, AIAgent):
+            if isinstance(agent1, LearningHumanPTAgent):
                 agent1.ref_update(payoff=reward1, state=pt_state1, opp_payoff=reward2)
                 pt_next_state1 = agent1.transform_state(next_state)
             else:
                 pt_next_state1 = None
 
-            if not isinstance(agent2, AIAgent):
+            if isinstance(agent2, LearningHumanPTAgent):
                 agent2.ref_update(payoff=reward2, state=pt_state2, opp_payoff=reward1)
                 pt_next_state2 = agent2.transform_state(next_state)
 
@@ -236,23 +236,17 @@ def train_agents(agent1, agent2, env, episodes=500,
             episode_actions1.append(action1)
             episode_actions2.append(action2)
 
-            # We calculate agent 1's best response given agent 2's actual action, and vice versa
-            agent1_a1, agent1_a2 = payoff_matrix[0, action2, 0], payoff_matrix[1, action2, 0]
-            agent2_a1, agent2_a2 = payoff_matrix[action1, 0, 1], payoff_matrix[action1, 1, 1]
+            # Agent 1 best response to agent 2's realized action
+            agent1_rewards = payoff_matrix[:, action2, 0]
+            br1 = np.argmax(agent1_rewards)
+            best_response1.append(br1)
+            best_reward1.append(agent1_rewards[br1])
 
-            if agent1_a1 > agent1_a2:
-                best_response1.append(0)
-                best_reward1.append(agent1_a1)
-            else:
-                best_response1.append(1)
-                best_reward1.append(agent1_a2)
-
-            if agent2_a1 > agent2_a2:
-                best_response2.append(0)
-                best_reward2.append(agent2_a1)
-            else:
-                best_response2.append(1) 
-                best_reward2.append(agent2_a2)
+            # Agent 2 best response to agent 1's realized action
+            agent2_rewards = payoff_matrix[action1, :, 1]
+            br2 = np.argmax(agent2_rewards)
+            best_response2.append(br2)
+            best_reward2.append(agent2_rewards[br2])
 
             # For action heat map
             joint_counts[action1, action2] += 1

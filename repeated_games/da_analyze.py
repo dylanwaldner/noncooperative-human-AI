@@ -269,14 +269,14 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
             q_values1 = np.stack(results[f"{idx}"]['q_values1'])
             q_values1, q_values1_copy = q_values1[1:], q_values1[:-1]
             q_values1_diff = q_values1 - q_values1_copy
-            q_change1 = np.mean(np.abs(q_values1_diff), axis = tuple(range(1, q_values1_diff.ndim)))
+            q_change1 = np.max(np.abs(q_values1_diff), axis = tuple(range(1, q_values1_diff.ndim)))
 
             q_changes_p1.append(q_change1)
                 
         q_changes_p1 = np.stack(q_changes_p1)
         
         mean_changes_p1 = np.mean(q_changes_p1, axis=0) 
-        se_changes_p1 = np.std(q_changes_p1, axis=0) / np.sqrt(num_experiments)
+        se_changes_p1 = np.std(q_changes_p1, axis=0, ddof=1) / np.sqrt(num_experiments)
 
         x = np.arange(len(mean_changes_p1))
 
@@ -289,14 +289,14 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
             q_values2 = np.stack(results[f"{idx}"]['q_values2'])
             q_values2, q_values2_copy = q_values2[1:], q_values2[:-1]
             q_values2_diff = q_values2 - q_values2_copy
-            q_change2 = np.mean(np.abs(q_values2_diff), axis = tuple(range(1, q_values2_diff.ndim)))
+            q_change2 = np.max(np.abs(q_values2_diff), axis = tuple(range(1, q_values2_diff.ndim)))
             q_changes_p2.append(q_change2)
       
 
         q_changes_p2 = np.stack(q_changes_p2)
             
         mean_changes_p2 = np.mean(q_changes_p2, axis=0)
-        se_changes_p2 = np.std(q_changes_p2, axis=0) / np.sqrt(num_experiments)
+        se_changes_p2 = np.std(q_changes_p2, axis=0, ddof=1) / np.sqrt(num_experiments)
 
         x = np.arange(len(mean_changes_p2))
 
@@ -306,9 +306,7 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     ax6.set_xlabel("Steps")
     ax6.set_ylabel('Q Value Diff')
     ax6.set_title(f'95% Conf. Interval of Q Values Changes Over {len(results.keys())} Runs')
-    #ax6.xaxis.set_major_formatter(
-    #    FuncFormatter(lambda x, pos: f"{int(x*k)}")
-    #)
+    ax6.set_yscale('log')
     ax6.legend()
     ax6.grid(True, alpha=0.3)
 

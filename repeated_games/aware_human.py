@@ -14,33 +14,31 @@ class AwareHumanPTAgent:
     Compared to learning human, no beliefs and no RL, just a best reply agent. 
     """
 
-    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', lambda_ref=0.95, B=5, tit_for_tat=False):
+    def __init__(self, payoff_matrix, pt_params, action_size, state_size, agent_id=0, opp_params=None, ref_setting='Fixed', tit_for_tat=False):
         self.payoff_matrix = payoff_matrix
         self.pt = ProspectTheory(**pt_params)
 
         self.agent_id = agent_id  # 0 for row player, 1 for column player
         # Defaulted to 0.95, the number here is pretty arbitrary just the reference update parameter
 
-        self.init_lam_ref = lambda_ref
-        self.lam_r = self.init_lam_ref
-        self.ref_k = 0.9
-
         self.ref_update_mode = ref_setting
 
-        self.B = B
+        # We initialize the ref point at r, but then change it if the ref mode is not fixed to a BR
+        self.ref_point = pt_params['r']
 
-        self.max_payoff, self.min_payoff = payoff_matrix[:, :, agent_id].max(), payoff_matrix[:, :, agent_id].min()
+        self.best_response_val = None
+        self.opp_best_resp_val = None
+        _ = self.act()
+        self.set_ref_point()
 
         self.tit_for_tat = tit_for_tat
 
-        self.ref_point = pt_params['r']
         self.tau = 0.1 # tie break threshold
         self.temperature = 1.3 # High value to encourage randomness
 
         # env parameters
         self.action_size = action_size
         self.opp_action_size = opp_params['opponent_action_size']
-        self.state_size = state_size * B - 1
 
         # Important to know whether to apply pt transformation
         self.opponent_type = opp_params['opponent_type']
@@ -64,28 +62,6 @@ class AwareHumanPTAgent:
         self.pt_l2_dists = []
         self.action_changed_flags = []
 
-    def transform_state(self, state):
-        # Transform the states from the s(H) to s(H)B format
-        # First, normalize for simplicity
-        low = self.min_payoff
-        high = self.max_payoff
-
-        denom = high - low
-        if denom == 0:
-            norm_ref_point = 0
-        else:
-            norm_ref_point = (self.ref_point - low) / denom
-
-        # Clip to 0, 1 for binning
-        norm_ref_point = max(0.0, min(1.0, norm_ref_point))
-
-        # Get its bin
-        ref_bin = min(int(norm_ref_point * self.B), self.B - 1)
-
-        # Use the bin to get the transformed state
-        pt_state = state * self.B + ref_bin
-        return pt_state
-
     def get_opp_br(self, matrix):
         '''
         We start by tracking the opponent replies conditioned on each of our actions. 
@@ -95,6 +71,7 @@ class AwareHumanPTAgent:
 
         # Track the indices of the best reply to each of OUR actions
         opp_best_responses = np.zeros(self.action_size, dtype=int)
+        opp_best_resp_val = -np.inf
 
         # Iterate over our own actions
         for i in range(self.action_size):
@@ -122,6 +99,11 @@ class AwareHumanPTAgent:
 
             # Index in the best response we foound for action i
             opp_best_responses[i] = opp_best_response
+            if opp_best_value > opp_best_resp_val:
+                opp_best_resp_val = opp_best_value
+
+        if self.opp_best_resp_val is None:
+            self.opp_best_resp_val = opp_best_resp_val 
 
         return opp_best_responses
 
@@ -194,7 +176,6 @@ class AwareHumanPTAgent:
     def act(self, last_opp_action=None):
         if not self.tit_for_tat:
             self.global_steps += 1
-            self.lam_ref_update()
 
             matrix = self.payoff_matrix
 
@@ -209,51 +190,28 @@ class AwareHumanPTAgent:
             # argmax the best action we can take conditioned on how the opponent will reply
             player_best_response = self.get_best_response(matrix, opp_best_responses)
 
+            if self.best_response_val is None:
+                self.best_response_val = matrix[player_best_response, opp_best_response, self.agent_id]
+
         else:
             # tit for tat
             player_best_response = last_opp_action
 
         return player_best_response
 
-    def lam_ref_update(self):
-        self.lam_r = self.init_lam_ref / self.global_steps ** self.ref_k        
-
-    def ref_update(self, payoff, state, opp_payoff):
+    def set_ref_point(self):
         '''
-        EMA handles gradual updates, Q says based on our knowledge whats the **best** that we can do,
-        EMAOR just sets reference point conditioned on opp rewards (we had a conversation talking about the psychology
-        of how good it *could* be)
-        Fixed doesnt get updated, its fixed
-        Still made sense to update the reference points for the AH, 
-        ***technically this is learning though so maybe you want to handle it another way***
+        AH ref points don't move, it has full knowledge. 
+        When fixed, we keep the ref point the same as all the other agents. When moving, we just set it statically to the BRs
         '''
         # here it made sense to keep the reference point 
         if self.ref_update_mode == "EMA":
-            self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * payoff
+            self.ref_point = self.best_response_val
 
-        # Here we dont need to maximize over Q values, we have the payoff matrix
-        # We just select the agent id from the 3rd dimension of the payoff table
-        # for reference the payoff tables are structured like this:
-        #
-        # np.array([
-        #        [[-1, -1], [-3, 0]],   # C/C, C/D
-        #        [[0, -3], [-2, -2]]    # D/C, D/D
-        #    ])
-        #
-        # We take the pt transformation just like with LH
         elif self.ref_update_mode == 'V':
-            opp_br = self.get_opp_br(self.payoff_matrix)
-            player_best_response = self.get_best_response(self.payoff_matrix, opp_br)
-            if self.agent_id == 0:
-                payoffs = self.payoff_matrix[player_best_response,opp_br,0]
+            self.ref_point = self.best_response_val
 
-            else:
-                payoffs = self.payoff_matrix[opp_br, player_best_response, 1]
-            
-            self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * payoffs.max()
-
-        # same deal just over opp rewards
         elif self.ref_update_mode == 'EMAOR':
-            self.ref_point = self.lam_r * self.ref_point + (1 - self.lam_r) * opp_payoff
-        # Make sure to actually update the pt function
+            self.ref_point = self.opp_best_resp_val
+
         self.pt.r = self.ref_point

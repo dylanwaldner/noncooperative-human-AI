@@ -115,7 +115,7 @@ def train_agents(agent1, agent2, env, episodes=500,
                     pt_state1 = agent1.transform_state(state)
                     action1 = agent1.act(pt_state1)
                 else: # Aware Human
-                    pt_state1 = agent1.transform_state(state)
+                    pt_state1 = None
                     action1 = agent1.act(last_action2)
 
             else: # AI Agent
@@ -127,8 +127,8 @@ def train_agents(agent1, agent2, env, episodes=500,
                 if isinstance(agent2, LearningHumanPTAgent):
                     pt_state2 = agent2.transform_state(state)
                     action2 = agent2.act(pt_state2)
-                else:
-                    pt_state2 = agent2.transform_state(state)
+                else: # AH 
+                    pt_state2 = None
                     action2 = agent2.act(last_action1)
 
             else:
@@ -436,7 +436,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                     opp_params['opp_ref'] = ref_point2 
                     opp_params['opp_pt'] = pt_params2
 
-                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=0, opp_params=opp_params,ref_setting=ref_setting, lambda_ref=ref_lambda)
+                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=0, opp_params=opp_params,ref_setting=ref_setting)
 
             if agent1_type == 'AH2':
                 opp_params = dict()
@@ -448,7 +448,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                     opp_params['opp_ref'] = ref_point2
                     opp_params['opp_pt'] = pt_params2
 
-                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda, tit_for_tat=True)
+                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, tit_for_tat=True)
 
             if agent2_type == 'AH1':
                 opp_params = dict()
@@ -460,7 +460,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                     opp_params['opp_ref'] = ref_point1
                     opp_params['opp_pt'] = pt_params1
 
-                agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda)
+                agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting)
 
             if agent2_type == 'AH2':
                 opp_params = dict()
@@ -472,7 +472,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                     opp_params['opp_ref'] = ref_point1
                     opp_params['opp_pt'] = pt_params1
 
-                agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, lambda_ref=ref_lambda, tit_for_tat=True)
+                agent2 = AwareHumanPTAgent(payoff_matrix, pt_params2, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, tit_for_tat=True)
 
 
             # Train the matchup

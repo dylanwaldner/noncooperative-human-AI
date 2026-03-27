@@ -71,7 +71,7 @@ class AwareHumanPTAgent:
 
         # Track the indices of the best reply to each of OUR actions
         opp_best_responses = np.zeros(self.action_size, dtype=int)
-        opp_best_resp_val = -np.inf
+        opp_best_response_vals = np.zeros(self.action_size, dtype=np.float32)
 
         # Iterate over our own actions
         for i in range(self.action_size):
@@ -99,15 +99,11 @@ class AwareHumanPTAgent:
 
             # Index in the best response we foound for action i
             opp_best_responses[i] = opp_best_response
-            if opp_best_value > opp_best_resp_val:
-                opp_best_resp_val = opp_best_value
+            opp_best_response_vals[i] = opp_best_value
 
-        if self.opp_best_resp_val is None:
-            self.opp_best_resp_val = opp_best_resp_val 
+        return opp_best_responses, opp_best_response_vals
 
-        return opp_best_responses
-
-    def get_best_response(self, matrix, opp_best_responses):
+    def get_best_response(self, matrix, opp_best_responses, opp_best_vals):
         '''
         Now we are looking through our responses and indexing into them with the opponent BRs. 
         The point is that we are assuming that the opp plays that best response, and then we select
@@ -174,6 +170,9 @@ class AwareHumanPTAgent:
         if self.best_response_val is None:
             self.best_response_val = EU_best_vals[EU_opt_a]
 
+        if self.opp_best_resp_val is None:
+            self.opp_best_resp_val = opp_best_vals[EU_opt_a]
+
         return best_response
 
     def act(self, last_opp_action=None):
@@ -187,11 +186,11 @@ class AwareHumanPTAgent:
                 matrix = matrix.transpose(1, 0, 2)
 
             # First we need to get the opp best responses to our actions 
-            opp_best_responses = self.get_opp_br(matrix)
+            opp_best_responses, opp_best_vals = self.get_opp_br(matrix)
 
             # Now the decision matrix has gone from 2x2 -> 2x1. We plug in each opp response and 
             # argmax the best action we can take conditioned on how the opponent will reply
-            player_best_response = self.get_best_response(matrix, opp_best_responses)
+            player_best_response = self.get_best_response(matrix, opp_best_responses, opp_best_vals)
 
 
         else:

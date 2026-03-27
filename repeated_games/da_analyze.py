@@ -68,9 +68,19 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     ref_points_p1 = []
     ref_points_p2 = []
 
+    # Storing these just to make AH ref point explicit
+    r_1 = None
+    r_2 = None
+
     for idx in range(len(results.keys())):
         ref_points1 = results[f"{idx}"]['ref_points1']
         ref_points2 = results[f"{idx}"]['ref_points2']
+
+        if r_1 is None and len(ref_points1) > 0:
+            r_1 = ref_points1[-1]
+
+        if r_2 is None and len(ref_points2) > 0:
+            r_2 = ref_points2[-1]
 
         ref_points_p1.append(ref_points1)
         ref_points_p2.append(ref_points2)
@@ -81,9 +91,16 @@ def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matr
     mean_p1, mean_p2 = np.mean(ref_points_p1, axis=0), np.mean(ref_points_p2, axis=0)
     std_p1, std_p2 = np.std(ref_points_p1, axis=0), np.std(ref_points_p2, axis=0)
     se_p1, se_p2 = std_p1 / np.sqrt(num_experiments), std_p2 / np.sqrt(num_experiments)
-    
-    ax2.plot(mean_p1, label=f'{agent1_type}')
-    ax2.plot(mean_p2, label=f'{agent2_type}')
+
+    if agent1_type.startswith("AH"):
+        ax2.plot(mean_p1, label=f'{agent1_type} r={r_1}')
+    else:
+        ax2.plot(mean_p1, label=f'{agent1_type}')
+
+    if agent2_type.startswith("AH"):
+        ax2.plot(mean_p2, label=f'{agent2_type} r={r_2}')
+    else:
+        ax2.plot(mean_p2, label=f'{agent2_type}')
 
     x = np.arange(len(mean_p1))
 

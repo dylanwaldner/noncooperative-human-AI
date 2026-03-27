@@ -315,14 +315,14 @@ class LearningHumanPTAgent:
         q_value = self.q_values[state][action][opp_action]
 
         # Calculate current state value
-        state_q_val = max(
-            self.q_values[state][a].dot(self.beliefs[state])
+        next_state_q_val = max(
+            self.q_values[next_state][a].dot(self.beliefs[next_state])
             for a in range(self.action_size)
         )
 
         # Calculate delta in untransformed reward space
         # This update rule is 7.39 in Neurodynamic Programming (adapted from DP to RL)
-        delta = reward + state_q_val - avg_state_q_value
+        delta = reward + next_state_q_val - avg_state_q_value
         # Update q values
         self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta
 

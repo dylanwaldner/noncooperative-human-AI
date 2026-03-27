@@ -289,7 +289,7 @@ def interactive_experiment():
             game_name = f"Double Auction Game {price_range}"
 
 
-            state_histories = [2, 0] 
+            state_histories = [0, 2] 
             for state_history in state_histories: 
                 env = DoubleAuction(k=price_range, valuation=valuation, cost=cost, horizon=100, state_history=state_history)
                 payoff_matrix = env.build_payoff_matrix()

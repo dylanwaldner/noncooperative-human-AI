@@ -100,7 +100,7 @@ class AIAgent:
         # Get the max val for the average state q value
         avg_q_val = self.get_q_values()
         max_avg_q_val = avg_q_val.max()
-        next_state_q_val = self.q_values[state].max()
+        next_state_q_val = self.q_values[next_state].max()
 
         if self.state_size == 1:
             next_state_q_val = 0

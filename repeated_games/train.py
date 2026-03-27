@@ -99,7 +99,9 @@ def train_agents(agent1, agent2, env, episodes=500,
         best_reward1 = []
         best_reward2 = []
 
+        ep_time = time.time()
         for _ in range(env.horizon):
+            step_time = time.time()
             results['states'].append(state)
 
             # We transform the PT agents states to include ref bins
@@ -117,7 +119,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 # Agent 1 chooses action
                 action1 = agent1.act(state)
 
-            print(action1)
 
             if not isinstance(agent2, AIAgent):
                 if isinstance(agent2, LearningHumanPTAgent):
@@ -248,9 +249,14 @@ def train_agents(agent1, agent2, env, episodes=500,
             # Step through
             state = next_state
  
+            print(f"Step Time = {time.time() - step_time}")
 
             if done:
                 break
+
+        print("*" * 80)
+        print(f"EP Time = {time.time() - ep_time}")
+        print("*" * 80)
 
         # Store episode results
         print(f"\rEpisode {episode+1} of {episodes}", end='')

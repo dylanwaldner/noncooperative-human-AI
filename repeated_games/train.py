@@ -111,10 +111,13 @@ def train_agents(agent1, agent2, env, episodes=500,
                     pt_state1 = None
                     action1 = agent1.act(last_action2)
 
+
             else: # AI Agent
                 pt_state1 = None
                 # Agent 1 chooses action
                 action1 = agent1.act(state)
+
+            print(action1)
 
             if not isinstance(agent2, AIAgent):
                 if isinstance(agent2, LearningHumanPTAgent):

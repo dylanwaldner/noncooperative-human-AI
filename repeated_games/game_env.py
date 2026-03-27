@@ -23,13 +23,13 @@ class RepeatedGameEnv:
         if self.state_history == 0:
             return 0
 
-        base = self.k * self.k
+        base = 4
         state = 0
 
         recent = self.history[-self.state_history:]
 
         for i, (a1, a2) in enumerate(reversed(recent)):
-            pair = (a1 - 1) * self.k + (a2 - 1)
+            pair = (a1) * 2 + (a2)
             state += pair * (base ** i)
 
         return state

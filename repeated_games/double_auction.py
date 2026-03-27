@@ -58,6 +58,7 @@ class DoubleAuction:
     recent = self.history[-self.state_history:]
 
     for i, (a1, a2) in enumerate(reversed(recent)):
+        # Convert price space (1 indexed) to action space (0 indexed)
         pair = (a1 - 1) * self.k + (a2 - 1)
         state += pair * (base ** i)
 
@@ -65,13 +66,14 @@ class DoubleAuction:
 
   def step(self, bid, ask):
     # The actions are 0 indexed, bids and asks are 1 indexed
+    # We do this to make sure prices and rewards are calculated in price space
     bid += 1
     ask += 1
 
     assert bid in self.B and ask in self.A, f"bid: {bid}, ask: {ask}"
 
     if self.state_history > 0:
-      self.history.append((action1, action2))
+      self.history.append((bid, ask))
       self.history = self.history[-self.state_history:]
 
     self.round += 1

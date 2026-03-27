@@ -12,21 +12,12 @@ import pandas as pd
 import time
 import copy
 import random
-from pympler import asizeof
 BASE_SEED = 42
 
 from matplotlib.ticker import FuncFormatter
 
 import os
 import time
-import psutil
-
-process = psutil.Process(os.getpid())
-
-def log_perf(ep_idx, t_start):
-    rss_mb = process.memory_info().rss / 1024**2
-    elapsed = time.perf_counter() - t_start
-    print(f"Episode {ep_idx}: time={elapsed:.3f}s, RSS={rss_mb:.2f} MB")
 
 def train_agents(agent1, agent2, env, episodes=500,
                  exploration_decay=0.99, verbose=True, game_name=''):
@@ -81,7 +72,7 @@ def train_agents(agent1, agent2, env, episodes=500,
 
     # Defined to initialize BR agents, agent1 and agent 2 actions sizes always the same for this setup
     action_size = agent1.action_size
-    if game_name == 'Double Auction Game':
+    if game_name.startswith('Double Auction Game'):
         payoff_matrix = env.build_payoff_matrix()
 
     else:
@@ -90,7 +81,6 @@ def train_agents(agent1, agent2, env, episodes=500,
     last_action1, last_action2 = 0, 0
 
     for episode in range(episodes):
-        t0 = time.perf_counter()
 
         state = env.reset()
         episode_rewards1 = []
@@ -138,7 +128,6 @@ def train_agents(agent1, agent2, env, episodes=500,
                 pt_state2 = None
                 # Agent 1 chooses action
                 action2 = agent2.act(state)
-
 
             last_action1, last_action2 = action1, action2
 
@@ -229,9 +218,8 @@ def train_agents(agent1, agent2, env, episodes=500,
                 if not isinstance(agent2, AIAgent):
                     agent1.opp_pt = agent2.pt
 
-
             global_step += 1
- 
+
             # Store results
             episode_rewards1.append(reward1)
             episode_rewards2.append(reward2)
@@ -256,11 +244,10 @@ def train_agents(agent1, agent2, env, episodes=500,
 
             # Step through
             state = next_state
+ 
 
             if done:
                 break
-
-        #log_perf(episode, t0) print memory and time per episode
 
         # Store episode results
         print(f"\rEpisode {episode+1} of {episodes}", end='')
@@ -480,7 +467,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         all_results[matchup_key] = results
 
         # Analyze this matchup
-        if game_name != 'Double Auction Game':
+        if not game_name.startswith('Double Auction Game'):
             games_dict = get_all_games()
             analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, payoff_matrix, pt_params, ref_setting, env)
         else:

@@ -263,7 +263,6 @@ def interactive_experiment():
             print("\nDouble Auction Game")
             print("-"*40)
             # FOr double auction player 1 is the buyer, player 2 is the seller
-            game_name = "Double Auction Game"
             games_dict = ""
 
             # Range of prices the double auction game will operate in
@@ -286,6 +285,8 @@ def interactive_experiment():
                 cost = int(input(f"\n Set Cost (Default = 4, Max = {price_range}, Valuation = {valuation}): ").strip())
                 if cost <= 0 or cost > price_range:
                     print("Invalid input, try again")
+
+            game_name = f"Double Auction Game {price_range}"
 
 
             state_histories = [0, 2] 

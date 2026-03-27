@@ -76,10 +76,10 @@ def analyze_matchup(results, agent1_type, agent2_type, game_name, games_dict, pa
         ref_points1 = results[f"{idx}"]['ref_points1']
         ref_points2 = results[f"{idx}"]['ref_points2']
         
-        if r_1 is None:
+        if r_1 is None and len(ref_points1) > 0:
             r_1 = ref_points1[-1]
 
-        if r_2 is None:
+        if r_2 is None and len(ref_points2) > 0:
             r_2 = ref_points2[-1]
 
         ref_points_p1.append(ref_points1)

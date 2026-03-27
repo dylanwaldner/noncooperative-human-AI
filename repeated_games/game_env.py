@@ -20,24 +20,28 @@ class RepeatedGameEnv:
         Most recent pair is least significant digit.
         (0,0)->0 (0,1)->1 (1,0)->2 (1,1)->3
         """
-        k = self.state_history
-        state = 0
-        for i in range(k):
-            if i < len(self.history):
-                a1, a2 = self.history[-(i+1)]
-                pair = a1 * 2 + a2
-            else:
-                pair = 0  # padding for missing history
-            state += pair * (4 ** i)
+        if self.state_history == 0:
+            return 0
 
-        return int(state)
+        base = self.k * self.k
+        state = 0
+
+        recent = self.history[-self.state_history:]
+
+        for i, (a1, a2) in enumerate(reversed(recent)):
+            pair = (a1 - 1) * self.k + (a2 - 1)
+            state += pair * (base ** i)
+
+        return state
 
     def step(self, action1, action2):
         reward1 = float(self.payoff_matrix[action1, action2, 0])
         reward2 = float(self.payoff_matrix[action1, action2, 1])
 
-        self.history.append((action1, action2))
-        self.history = self.history[-self.state_history:]
+        if self.state_history > 0:
+            self.history.append((action1, action2))
+            self.history = self.history[-self.state_history:]
+
         self.round += 1
 
         done = self.round >= self.horizon

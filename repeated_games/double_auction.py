@@ -70,8 +70,10 @@ class DoubleAuction:
 
     assert bid in self.B and ask in self.A, f"bid: {bid}, ask: {ask}"
 
-    self.history.append((bid, ask))
-    self.history = self.history[-self.state_history:]
+    if self.state_history > 0:
+      self.history.append((action1, action2))
+      self.history = self.history[-self.state_history:]
+
     self.round += 1
     done = self.round >= self.horizon
 

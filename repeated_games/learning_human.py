@@ -223,8 +223,8 @@ class LearningHumanPTAgent:
         # Capture old state to update sum:
         old_belief = self.beliefs[state].copy()
 
-        new_state_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
-        old_state_visits = max(0, new_state_visits - 1)
+        old_state_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
+        new_state_visits = old_state_visits + 1
 
         # Simple EMA for belief updates
         one_hot = np.zeros(self.opp_action_size)
@@ -232,7 +232,6 @@ class LearningHumanPTAgent:
         self.beliefs[state] = self.lam_b * self.beliefs[state] + (1 - self.lam_b) * one_hot
 
         # Remove old estimate, replace with new
-        state_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
         self.belief_sum -= old_state_visits * old_belief
         self.belief_sum += new_state_visits * self.beliefs[state]
  

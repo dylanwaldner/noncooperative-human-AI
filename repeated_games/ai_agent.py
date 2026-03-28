@@ -24,6 +24,9 @@ class AIAgent:
         for state in range(self.state_size):
             self.q_values[state] = np.zeros(self.action_size) 
 
+        self.q_sum = np.zeros(self.action_size)
+        self.total_state_visits = 0
+
         # state counter
         self.state_visit_counter = dict()
 
@@ -90,7 +93,12 @@ class AIAgent:
         if state not in self.state_visit_counter.keys():
             self.state_visit_counter[state] = [0] * self.action_size
 
+        # save old state's contribution before anything changes
+        old_state_table = self.q_values[state].copy()
+        old_state_visits = sum(self.state_visit_counter[state])
+
         self.state_visit_counter[state][action] += 1
+        new_state_visits = old_state_visits + 1
 
         self.update_alpha(state, action)
 
@@ -110,24 +118,16 @@ class AIAgent:
 
         # Convex combination style, just a stylistic difference not a numeric one
         self.q_values[state][action] = (1 - self.alpha) * curr_q_val + self.alpha * target  
+
+        # Now update the Q sum for this state
+        new_state_table = self.q_values[state]
+        self.q_sum -= old_state_visits * old_state_table
+        self.q_sum += new_state_visits * new_state_table
+   
+        self.total_state_visits += 1
        
     # Retrieve weighted average state Q values
     def get_q_values(self):
-        q_values = np.zeros(self.action_size)
-
-        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
-
-        if total_visits == 0:
-            return q_values
-
-        for state, q_val in self.q_values.items():
-            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
-
-            if num_visits == 0:
-                continue
-
-            weight = num_visits / total_visits
-
-            q_values += weight * q_val
-
-        return q_values
+        if self.total_state_visits == 0:
+            return np.zeros((self.action_size, self.opp_action_size))
+        return self.q_sum / self.total_state_visits

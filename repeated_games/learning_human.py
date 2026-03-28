@@ -59,6 +59,10 @@ class LearningHumanPTAgent:
             # Q-values Q(s, a_i, a_-i) represent joint action estimates
             self.q_values[state] = np.zeros((self.action_size, self.opp_action_size)) 
 
+        self.q_sum = np.zeros((self.action_size, self.opp_action_size))
+        self.belief_sum = np.zeros(self.opp_action_size)
+        self.total_state_visits = 0
+
         # track state visits for analysis
         self.state_visit_counter = dict()
         # Track pathology triggers
@@ -110,15 +114,16 @@ class LearningHumanPTAgent:
         return pt_state
 
     def act(self, state):
-        # Epsilon exploration (lines 16-17 in alg 1)
+        # Epsilon exploration 
         if random.random() < self.epsilon:
             return random.randrange(self.action_size)
 
-        # Pathology detection (lines 14, 18, 19 in alg 1)
+        # Pathology detection 
         ## Generate action values (see method below)
         action_values, EU_action_values = self.calculate_action_values(state)
 
         # We get the L2 distance between the EU and CPT actions 
+        # THis is for metric tracking
         PT_L2_dist = np.linalg.norm(action_values - EU_action_values)
 
         ## Identify Optimal action for tie break check
@@ -215,10 +220,23 @@ class LearningHumanPTAgent:
         return action_values, EU_action_values
 
     def belief_update(self, state, opp_action):
+        # Capture old state to update sum:
+        old_belief = self.beliefs[state].copy()
+
+        new_state_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
+        old_state_visits = max(0, new_state_visits - 1)
+
         # Simple EMA for belief updates
         one_hot = np.zeros(self.opp_action_size)
         one_hot[opp_action] = 1
         self.beliefs[state] = self.lam_b * self.beliefs[state] + (1 - self.lam_b) * one_hot
+
+        # Remove old estimate, replace with new
+        state_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
+        self.belief_sum -= old_state_visits * old_belief
+        self.belief_sum += new_state_visits * self.beliefs[state]
+ 
+  
 
     def alpha_update(self, state, action):
         step = self.state_visit_counter[state][action]
@@ -281,7 +299,13 @@ class LearningHumanPTAgent:
         if state not in self.state_visit_counter.keys():
             self.state_visit_counter[state] = [0] * self.action_size
 
+        # save old state's contribution before anything changes
+        old_state_table = self.q_values[state].copy()
+        old_state_visits = sum(self.state_visit_counter[state])
+
+        # count this visit
         self.state_visit_counter[state][action] += 1
+        new_state_visits = old_state_visits + 1
 
         self.lambda_ref_update()
         self.alpha_update(state, action)
@@ -326,45 +350,24 @@ class LearningHumanPTAgent:
         # Update q values
         self.q_values[state][action][opp_action] = (1 - self.alpha) * q_value + self.alpha * delta
 
+        # update running sum exactly for this one state only
+        new_state_table = self.q_values[state]
+        self.q_sum -= old_state_visits * old_state_table
+        self.q_sum += new_state_visits * new_state_table
+   
+        self.total_state_visits += 1
+
     # Retrieve weighted average state Q values
     def get_q_values(self):
-        q_values = np.zeros((self.action_size, self.opp_action_size))
-
-        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
-
-        if total_visits == 0:
-            return q_values
-
-        for state, q_vals in self.q_values.items():
-            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
-
-            if num_visits == 0:
-                continue
-
-            weight = num_visits / total_visits
-
-            q_values += weight * q_vals
-
-        return q_values
-
+        if self.total_state_visits == 0:
+            return np.zeros((self.action_size, self.opp_action_size))
+        return self.q_sum / self.total_state_visits
+    
     # Average state beliefs: needed for average state q value calculation
     def get_avg_beliefs(self):
-        avg_beliefs = np.zeros(self.opp_action_size)
-
-        total_visits = sum(sum(v) for v in self.state_visit_counter.values())
-  
-        if total_visits == 0:
-            return avg_beliefs
-
-
-        for state, value in self.beliefs.items():
-            num_visits = sum(self.state_visit_counter.get(state, [0] * self.action_size))
-            weight = num_visits / total_visits
-
-            avg_beliefs += weight * value
-
-        return avg_beliefs
-            
+        if self.total_state_visits == 0:
+            return np.ones(self.opp_action_size) / self.opp_action_size
+        return self.belief_sum / self.total_state_visits 
 
 
 

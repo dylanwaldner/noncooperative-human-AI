@@ -249,14 +249,8 @@ def train_agents(agent1, agent2, env, episodes=500,
             # Step through
             state = next_state
  
-            print(f"Step Time = {time.time() - step_time}")
-
             if done:
                 break
-
-        print("*" * 80)
-        print(f"EP Time = {time.time() - ep_time}")
-        print("*" * 80)
 
         # Store episode results
         print(f"\rEpisode {episode+1} of {episodes}", end='')

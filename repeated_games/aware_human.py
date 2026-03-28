@@ -59,7 +59,11 @@ class AwareHumanPTAgent:
 
         self.best_response_val = None
         self.opp_best_resp_val = None
-        _ = self.act()
+        
+        # We run OPP BR and Self BR to get the fixed ref points for the AH
+        opp_br, opp_bv = self.get_opp_br(payoff_matrix)
+        _ = self.get_best_response(payoff_matrix, opp_br, opp_bv)
+        
         self.set_ref_point()
 
     def get_opp_br(self, matrix):

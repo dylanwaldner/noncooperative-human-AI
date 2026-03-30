@@ -39,7 +39,7 @@ class AIAgent:
 
         self.alpha = 0.1
         self.init_alpha = self.alpha
-        self.k = 0.6 # Decay rate
+        self.k = 0.7 # Decay rate
 
         # tiebreaker variables
         self.tau = 0.1 # threshold

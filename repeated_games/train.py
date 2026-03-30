@@ -435,7 +435,7 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
                     opp_params['opp_ref'] = ref_point2
                     opp_params['opp_pt'] = pt_params2
 
-                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=1, opp_params=opp_params, ref_setting=ref_setting, tit_for_tat=True)
+                agent1 = AwareHumanPTAgent(payoff_matrix, pt_params1, action_size, env.state_size, agent_id=0, opp_params=opp_params, ref_setting=ref_setting, tit_for_tat=True)
 
             if agent2_type == 'AH1':
                 opp_params = dict()

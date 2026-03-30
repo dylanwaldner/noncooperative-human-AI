@@ -61,10 +61,21 @@ class AwareHumanPTAgent:
         self.opp_best_resp_val = None
         
         # We run OPP BR and Self BR to get the fixed ref points for the AH
-        opp_br, opp_bv = self.get_opp_br(payoff_matrix)
-        _ = self.get_best_response(payoff_matrix, opp_br, opp_bv)
-        
+        matrix = self.payoff_matrix
+        if self.agent_id == 1:
+            matrix = matrix.transpose(1, 0, 2)
+
+        opp_br, opp_bv = self.get_opp_br(matrix)
+        _ = self.get_best_response(matrix, opp_br, opp_bv)
         self.set_ref_point()
+
+        print("agent_id:", self.agent_id)
+        print("ref_update_mode:", self.ref_update_mode)
+        print("best_response_val:", self.best_response_val)
+        print("opp_best_resp_val:", self.opp_best_resp_val)
+        print("ref_point:", self.ref_point)
+        print("pt.r:", self.pt.r)
+
 
     def get_opp_br(self, matrix):
         '''
@@ -81,10 +92,12 @@ class AwareHumanPTAgent:
         for i in range(self.action_size):
             # Temp variable tracks the best response with our each set over OPP actions
             opp_best_value = float("-inf") # value for comparison
+            best_raw_payoff = None
             opp_best_response = 0 # index to return
             # now we look at apponent replies to each of our actions
             for j in range(self.opp_action_size):
                 opp_value = matrix[i, j, 1 - self.agent_id] # 1 - agent_id keeps this robust to both col/row
+                raw_value = opp_value # Store for Ref Point
 
                 # apply pt transformation if the opp is a pt player
                 if self.opp_cpt:
@@ -93,6 +106,7 @@ class AwareHumanPTAgent:
                 # Maximizing action values (eps helps prevent near ties)
                 if opp_value > opp_best_value + 1e-8:
                     opp_best_value = opp_value
+                    best_raw_payoff = raw_value
                     opp_best_response = j
 
                 # Tie Break logic (Maybe random is wrong here?)
@@ -103,7 +117,7 @@ class AwareHumanPTAgent:
 
             # Index in the best response we foound for action i
             opp_best_responses[i] = opp_best_response
-            opp_best_response_vals[i] = opp_best_value
+            opp_best_response_vals[i] = best_raw_payoff
 
         return opp_best_responses, opp_best_response_vals
 

@@ -50,8 +50,6 @@ class StudyConfig:
     pt_params2: dict = None
 
     fixed_kwargs_by_type: dict = None
-    fixed_agent1_kwargs: dict = None
-    fixed_agent2_kwargs: dict = None
 
 
 def make_objective(cfg):
@@ -297,13 +295,8 @@ def suggest_hparams(trial, agent_type):
 
 
 def get_matchups_for_game(game_name, state_history):
-    """
-    For symmetric games you can choose to skip redundant inverse labels.
-    For asymmetric games, include both orderings explicitly.
-    """
-
     if game_name in ["PrisonersDilemma", "StagHunt", "Chicken"]:
-        return [
+        matchups = [
             ("AH1", "AI"),
             ("AH2", "AI"),
             ("LH", "AI"),
@@ -314,26 +307,31 @@ def get_matchups_for_game(game_name, state_history):
             ("LH", "LH"),
             ("AI", "AI"),
         ]
+    else:
+        matchups = [
+            ("AH1", "AI"),
+            ("AI", "AH1"),
+            ("AH2", "AI"),
+            ("AI", "AH2"),
+            ("LH", "AI"),
+            ("AI", "LH"),
+            ("AH1", "LH"),
+            ("LH", "AH1"),
+            ("AH2", "LH"),
+            ("LH", "AH2"),
+            ("AH1", "AH1"),
+            ("AH2", "AH2"),
+            ("LH", "LH"),
+            ("AI", "AI"),
+        ]
 
-    return [
-        ("AH1", "AI"),
-        ("AI", "AH1"),
-        ("AH2", "AI"),
-        ("AI", "AH2"),
+    if state_history == 0:
+        matchups = [
+            (a1, a2) for (a1, a2) in matchups
+            if a1 != "AH2" and a2 != "AH2"
+        ]
 
-        ("LH", "AI"),
-        ("AI", "LH"),
-
-        ("AH1", "LH"),
-        ("LH", "AH1"),
-        ("AH2", "LH"),
-        ("LH", "AH2"),
-
-        ("AH1", "AH1"),
-        ("AH2", "AH2"),
-        ("LH", "LH"),
-        ("AI", "AI"),
-    ]
+    return matchups
 
 def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna_repeated.db"):
     all_results = dict()
@@ -367,8 +365,7 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
                 pt_params1=copy.deepcopy(base_cfg.pt_params1),
                 pt_params2=copy.deepcopy(base_cfg.pt_params2),
 
-                fixed_agent1_kwargs=copy.deepcopy(base_cfg.fixed_agent1_kwargs),
-                fixed_agent2_kwargs=copy.deepcopy(base_cfg.fixed_agent2_kwargs),
+                fixed_kwargs_by_type=copy.deepcopy(base_cfg.fixed_kwargs_by_type),
             )
 
             study_name_1 = f"{matchup_key}__tune_agent1"
@@ -403,8 +400,7 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
                 pt_params1=copy.deepcopy(base_cfg.pt_params1),
                 pt_params2=copy.deepcopy(base_cfg.pt_params2),
 
-                fixed_agent1_kwargs=copy.deepcopy(base_cfg.fixed_agent1_kwargs),
-                fixed_agent2_kwargs=copy.deepcopy(base_cfg.fixed_agent2_kwargs),
+                fixed_kwargs_by_type=copy.deepcopy(base_cfg.fixed_kwargs_by_type),
             )
 
             study_name_2 = f"{matchup_key}__tune_agent2"

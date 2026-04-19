@@ -19,7 +19,27 @@ class LearningHumanPTAgent:
     Running belief, reference point scalars are tracked and updated after each step of the environment
     """
 
-    def __init__(self, state_size, action_size, opp_action_size, pt_params, agent_id=0, ref_setting='Fixed', lambda_ref=0.95, payoff_matrix = None, B=5):
+    def __init__(
+        self,
+        state_size,
+        action_size,
+        opp_action_size,
+        pt_params,
+        agent_id=0,
+        ref_setting='Fixed',
+        lambda_ref=0.95,
+        payoff_matrix=None,
+        B=5,
+        epsilon=0.3,
+        epsilon_min=0.01,
+        epsilon_decay=0.995,
+        alpha=0.1,
+        k=0.7,
+        tau=0.1,
+        temperature=1.3,
+        lam_b=0.95,
+        ref_k=0.9,
+    ):
         self.state_size = state_size * B - 1
         self.action_size = action_size
         self.opp_action_size = opp_action_size
@@ -37,27 +57,27 @@ class LearningHumanPTAgent:
         self.q_values = dict()
 
         # Initialize belief and reference point lambda parameters. 0.95 is a standard setting, carries across episodes
-        self.lam_b = 0.95
+        self.lam_b = lam_b
 
 
         self.init_lam_ref = lambda_ref
         self.lam_r = self.init_lam_ref
-        self.ref_k = 0.9
+        self.ref_k = ref_k
 
         # Set reference point update mode:
         # options: Fixed, EMA, Max Q value (conditioned on beliefs over opp actions), 
         # EMAOR (Opponent reward not own reward)
-        self.ref_update_mode = ref_setting 
-       
+        self.ref_update_mode = ref_setting
+
         # Add an entry for each state populated with uniform probabilities over opponent action set size
         # And initialize q values
         for state in range(self.state_size + 1):
             # Belief function is size: opp action size because they are beliefs over opponent actions
             # we divide by the action size to get equiprobably starting points
             self.beliefs[state] = np.ones(self.opp_action_size) / self.opp_action_size
-            
+
             # Q-values Q(s, a_i, a_-i) represent joint action estimates
-            self.q_values[state] = np.zeros((self.action_size, self.opp_action_size)) 
+            self.q_values[state] = np.zeros((self.action_size, self.opp_action_size))
 
         self.q_sum = np.zeros((self.action_size, self.opp_action_size))
         self.belief_sum = np.zeros(self.opp_action_size)
@@ -71,23 +91,23 @@ class LearningHumanPTAgent:
         # Q-learning parameters, all from paper. Perhaps gamma could be set to 0.99?
         #self.gamma = 0.95 
         self.avg_rew = 0.0
-        self.epsilon = 0.3
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
 
-        self.alpha = 0.1 # standard init alpha value from what I can tell
+        self.alpha = alpha # standard init alpha value from what I can tell
         self.init_alpha = self.alpha
-        self.k = 0.7
+        self.k = k
 
         # Pathology Detection parameters
-        self.tau = 0.1 # Threshold parameter
+        self.tau = tau # Threshold parameter
 
-        self.temperature = 1.3 # softmax temperature, high to encourage randomness in the tie breaks for exploration
+        self.temperature = temperature # softmax temperature, high to encourage randomness in the tie breaks for exploration
 
         # Track raw vs PT rewards
         self.raw_rewards = []
         self.pt_rewards = []
-       
+
         self.pt_l2_dists = []
         self.action_changed_flags = []
 

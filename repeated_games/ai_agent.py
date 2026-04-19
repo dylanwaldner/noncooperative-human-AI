@@ -10,7 +10,20 @@ class AIAgent:
     Should be super straightforward
     """
 
-    def __init__(self, state_size, action_size, opp_action_size, agent_id=0):
+    def __init__(
+        self,
+        state_size,
+        action_size,
+        opp_action_size,
+        agent_id=0,
+        epsilon=0.3,
+        epsilon_min=0.01,
+        epsilon_decay=0.995,
+        alpha=0.1,
+        k=0.7,
+        tau=0.1,
+        temp=1.3,
+    ):
         self.state_size = state_size
         self.action_size = action_size
         self.opp_action_size = opp_action_size
@@ -18,11 +31,11 @@ class AIAgent:
 
         # Initialize q values as a dictionary
         self.q_values = dict()
-       
+
         # Add an entry for each state 
         # And initialize q values as Q(s, a), no opponent conditioning because no beliefs for AI
         for state in range(self.state_size):
-            self.q_values[state] = np.zeros(self.action_size) 
+            self.q_values[state] = np.zeros(self.action_size)
 
         self.q_sum = np.zeros(self.action_size)
         self.total_state_visits = 0
@@ -33,17 +46,17 @@ class AIAgent:
         # Q-learning parameters, set from code i inherited, and all is converging so I see no issue. 
         # self.gamma = 0.95
         self.avg_rew = 0.0
-        self.epsilon = 0.3
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
 
-        self.alpha = 0.1
+        self.alpha = alpha
         self.init_alpha = self.alpha
-        self.k = 0.7 # Decay rate
+        self.k = k # Decay rate
 
         # tiebreaker variables
-        self.tau = 0.1 # threshold
-        self.temp = 1.3 # softmax temp, high to encourage randomness
+        self.tau = tau # threshold
+        self.temp = temp # softmax temp, high to encourage randomness
         self.softmax_counter = 0
 
     def act(self, state):

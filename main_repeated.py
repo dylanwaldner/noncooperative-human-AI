@@ -318,7 +318,7 @@ def interactive_experiment():
         elif choice == '4':
             games_list = list(games.keys())
             all_results = dict()
-            for game_name in games_list[5:]:
+            for game_name in games_list:
                 state_histories = [0, 2]
                 for state_history in state_histories:
                     ref_settings = ["Fixed", "EMA", "V", "EMAOR"]

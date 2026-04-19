@@ -54,7 +54,7 @@ class StudyConfig:
 
 def make_objective(cfg):
     games = get_all_games()
-    payoff_matrix = games[cfg.game_name]
+    payoff_matrix = games[cfg.game_name]['payoffs']
 
     def objective(trial):
         target_agent_type = cfg.agent1_type if cfg.target_slot == 1 else cfg.agent2_type
@@ -95,6 +95,8 @@ def make_objective(cfg):
             curve = np.asarray(results[reward_key], dtype=float)
             tail_n = max(1, int(len(curve) * cfg.last_frac))
             score = float(curve[-tail_n:].mean())
+            if np.isnan(score):
+                raise ValueError("NaN score encountered")
 
             seed_scores.append(score)
 
@@ -332,6 +334,9 @@ def get_matchups_for_game(game_name, state_history):
 
     return matchups
 
+def is_tunable_agent(agent_type):
+    return agent_type in ["AI", "LH"]
+
 def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna_repeated.db"):
     all_results = dict()
 
@@ -368,14 +373,16 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
             )
 
             study_name_1 = f"{matchup_key}__tune_agent1"
-            try:
+            target_agent_type_1 = agent1_type
+
+            if is_tunable_agent(target_agent_type_1):
                 study1 = run_study(cfg1, n_trials=n_trials, study_name=study_name_1, storage=storage)
                 all_results[matchup_key]["tune_agent1"] = {
                     "best_value": study1.best_value,
                     "best_params": study1.best_params,
                 }
-            except ValueError as e:
-                print(f"Skipping {study_name_1}: {e}")
+            else:
+                print(f"Skipping {study_name_1}: no search space for {target_agent_type_1}")
 
             # tune slot 2
             cfg2 = StudyConfig(
@@ -403,14 +410,16 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
             )
 
             study_name_2 = f"{matchup_key}__tune_agent2"
-            try:
+            target_agent_type_2 = agent2_type
+
+            if is_tunable_agent(target_agent_type_2):
                 study2 = run_study(cfg2, n_trials=n_trials, study_name=study_name_2, storage=storage)
                 all_results[matchup_key]["tune_agent2"] = {
                     "best_value": study2.best_value,
                     "best_params": study2.best_params,
                 }
-            except ValueError as e:
-                print(f"Skipping {study_name_2}: {e}")
+            else:
+                print(f"Skipping {study_name_2}: no search space for {target_agent_type_2}")
 
     return all_results
 
@@ -430,7 +439,7 @@ if __name__ == "__main__":
         ref_lambda=0.95,
 
         exploration_decay=0.99,
-        n_seeds=3,
+        n_seeds=1,
         last_frac=0.2,
 
         pt_params1=copy.deepcopy(DEFAULT_PT_PARAMS),
@@ -462,7 +471,7 @@ if __name__ == "__main__":
     results = run_all_studies(
         games_dict=games,
         base_cfg=base_cfg,
-        n_trials=50,
+        n_trials=1,
         storage="sqlite:///optuna_repeated.db",
     )
 

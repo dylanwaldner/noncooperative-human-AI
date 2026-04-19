@@ -11,7 +11,7 @@ from pathlib import Path
 import json
 import gzip
 
-DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experiments"
+DIR_PATH = "/Users/dylanwaldner/Projects/RLNash/Experimentsnodecay"
 
 def analyze_matchup_da(results, agent1_type, agent2_type, game_name, payoff_matrix, pt_params, ref_type, env):
     """

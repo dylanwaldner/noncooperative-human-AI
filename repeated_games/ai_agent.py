@@ -33,13 +33,13 @@ class AIAgent:
         # Q-learning parameters, set from code i inherited, and all is converging so I see no issue. 
         # self.gamma = 0.95
         self.avg_rew = 0.0
-        self.epsilon = 0.3
+        self.epsilon = 0.2
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 
-        self.alpha = 0.1
+        self.alpha = 1 # Default is 1, anything else = ablation
         self.init_alpha = self.alpha
-        self.k = 0.7 # Decay rate
+        self.k = 0 # Decay rate 0.7 is default, anything else is ablation
 
         # tiebreaker variables
         self.tau = 0.1 # threshold

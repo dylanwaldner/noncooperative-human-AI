@@ -71,13 +71,13 @@ class LearningHumanPTAgent:
         # Q-learning parameters, all from paper. Perhaps gamma could be set to 0.99?
         #self.gamma = 0.95 
         self.avg_rew = 0.0
-        self.epsilon = 0.3
+        self.epsilon = 0.2
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 
-        self.alpha = 0.1 # standard init alpha value from what I can tell
+        self.alpha = 1 # Default is 1, anything else is an ablation
         self.init_alpha = self.alpha
-        self.k = 0.7
+        self.k = 0
 
         # Pathology Detection parameters
         self.tau = 0.1 # Threshold parameter

@@ -49,12 +49,9 @@ class StudyConfig:
     pt_params1: dict = None
     pt_params2: dict = None
 
+    fixed_kwargs_by_type: dict = None
     fixed_agent1_kwargs: dict = None
     fixed_agent2_kwargs: dict = None
-
-def set_all_seeds(seed: int) -> None:
-    np.random.seed(seed)
-    random.seed(seed)
 
 
 def make_objective(cfg):
@@ -145,6 +142,9 @@ def build_agent(
     agent_kwargs = agent_kwargs or {}
 
     if agent_type == 'LH':
+        agent_kwargs = copy.deepcopy(agent_kwargs or {})
+        lambda_ref = agent_kwargs.pop("lambda_ref", ref_lambda)
+
         return LearningHumanPTAgent(
             env.state_size,
             action_size,
@@ -152,11 +152,10 @@ def build_agent(
             pt_params_self,
             agent_id=agent_id,
             ref_setting=ref_setting,
-            lambda_ref=ref_lambda,
+            lambda_ref=lambda_ref,
             payoff_matrix=payoff_matrix,
             **agent_kwargs,
         )
-
     elif agent_type == 'AI':
         return AIAgent(
             env.state_size,
@@ -219,8 +218,8 @@ def build_agents_for_trial(
     pt_params1 = copy.deepcopy(cfg.pt_params1 or DEFAULT_PT_PARAMS)
     pt_params2 = copy.deepcopy(cfg.pt_params2 or DEFAULT_PT_PARAMS)
 
-    fixed_agent1_kwargs = copy.deepcopy(cfg.fixed_agent1_kwargs or {})
-    fixed_agent2_kwargs = copy.deepcopy(cfg.fixed_agent2_kwargs or {})
+    fixed_agent1_kwargs = copy.deepcopy((cfg.fixed_kwargs_by_type or {}).get(cfg.agent1_type, {}))
+    fixed_agent2_kwargs = copy.deepcopy((cfg.fixed_kwargs_by_type or {}).get(cfg.agent2_type, {}))
 
     # Apply Optuna params only to the target slot
     if cfg.target_slot == 1:
@@ -297,14 +296,13 @@ def suggest_hparams(trial, agent_type):
         raise ValueError(f"Unsupported agent type: {agent_type}")
 
 
-def get_ordered_matchups_for_game(game_name, payoff_matrix):
+def get_matchups_for_game(game_name, state_history):
     """
     For symmetric games you can choose to skip redundant inverse labels.
     For asymmetric games, include both orderings explicitly.
     """
-    symmetric = is_role_symmetric(payoff_matrix)
 
-    if symmetric and game_name in ["PrisonersDilemma", "StagHunt", "Chicken"]:
+    if game_name in ["PrisonersDilemma", "StagHunt", "Chicken"]:
         return [
             ("AH1", "AI"),
             ("AH2", "AI"),
@@ -420,13 +418,14 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
                 print(f"Skipping {study_name_2}: {e}")
 
     return all_results
+
 if __name__ == "__main__":
     base_cfg = StudyConfig(
         game_name="PrisonersDilemma",   # placeholder, overwritten in run_all_studies
         agent1_type="LH",               # placeholder
         agent2_type="AI",               # placeholder
         target_slot=1,                  # placeholder
-
+        
         episodes=500,
         horizon=100,
         state_history=2,
@@ -442,16 +441,28 @@ if __name__ == "__main__":
         pt_params1=copy.deepcopy(DEFAULT_PT_PARAMS),
         pt_params2=copy.deepcopy(DEFAULT_PT_PARAMS),
 
-        fixed_agent1_kwargs={},
-        fixed_agent2_kwargs={
-            "epsilon": 0.3,
-            "alpha": 0.1,
-            "k": 0.7,
-            "tau": 0.1,
-            "temp": 1.3,
+        fixed_kwargs_by_type={
+            "AI": {
+                "epsilon": 0.3,
+                "alpha": 0.1,
+                "k": 0.7,
+                "tau": 0.1,
+                "temp": 1.3,
+            },
+            "LH": {
+                "epsilon": 0.3,
+                "alpha": 0.1,
+                "k": 0.7,
+                "tau": 0.1,
+                "temperature": 1.3,
+                "lam_b": 0.95,
+                "lambda_ref": 0.95,
+                "B": 5,
+            },
+            "AH1": {},
+            "AH2": {},
         },
     )
-
     games = get_all_games()
     results = run_all_studies(
         games_dict=games,

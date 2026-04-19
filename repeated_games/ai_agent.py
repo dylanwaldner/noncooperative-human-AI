@@ -33,7 +33,7 @@ class AIAgent:
         # Q-learning parameters, set from code i inherited, and all is converging so I see no issue. 
         # self.gamma = 0.95
         self.avg_rew = 0.0
-        self.epsilon = 0.2
+        self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 

@@ -71,7 +71,7 @@ class LearningHumanPTAgent:
         # Q-learning parameters, all from paper. Perhaps gamma could be set to 0.99?
         #self.gamma = 0.95 
         self.avg_rew = 0.0
-        self.epsilon = 0.2
+        self.epsilon = 0.3
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
 

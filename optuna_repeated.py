@@ -284,7 +284,6 @@ def suggest_hparams(trial, agent_type):
             "epsilon_decay": trial.suggest_float("epsilon_decay", 0.95, 0.999),
             "lam_b": trial.suggest_float("lam_b", 0.7, 0.999),
             "lambda_ref": trial.suggest_float("lambda_ref", 0.7, 0.999),
-            "B": trial.suggest_int("B", 3, 8),
         }
 
     elif agent_type in ["AH1", "AH2"]:

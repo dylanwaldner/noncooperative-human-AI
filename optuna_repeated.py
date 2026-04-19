@@ -57,164 +57,6 @@ def set_all_seeds(seed: int) -> None:
     random.seed(seed)
 
 
-def build_env(payoff_matrix, horizon: int, state_history: int):
-    return RepeatedGameEnv(
-        payoff_matrix=payoff_matrix,
-        horizon=horizon,
-        state_history=state_history,
-    )
-
-
-def build_ai(env, agent_id: int, kwargs: dict | None = None):
-    kwargs = kwargs or {}
-    return AIAgent(
-        state_size=env.state_size,
-        action_size=2,
-        opp_action_size=2,
-        agent_id=agent_id,
-        **kwargs,
-    )
-
-
-def build_lh(env, payoff_matrix, pt_params, agent_id: int, ref_setting: str, lambda_ref: float, B: int,
-             kwargs: dict | None = None):
-    kwargs = kwargs or {}
-    return LearningHumanPTAgent(
-        state_size=env.state_size,
-        action_size=2,
-        opp_action_size=2,
-        pt_params=pt_params,
-        agent_id=agent_id,
-        ref_setting=ref_setting,
-        lambda_ref=lambda_ref,
-        payoff_matrix=payoff_matrix,
-        B=B,
-        **kwargs,
-    )
-
-
-def build_ah(env, payoff_matrix, pt_params, agent_id: int, opponent_type: str, opp_pt_params: dict,
-             ref_setting: str):
-    opp_params = {
-        "opponent_action_size": 2,
-        "opponent_type": opponent_type,
-        "opp_pt": opp_pt_params,
-    }
-    return AwareHumanPTAgent(
-        payoff_matrix=payoff_matrix,
-        pt_params=pt_params,
-        action_size=2,
-        state_size=env.state_size,
-        agent_id=agent_id,
-        opp_params=opp_params,
-        ref_setting=ref_setting,
-    )
-
-
-def suggest_target_hparams(trial: optuna.Trial, target_agent_type: str) -> dict:
-    if target_agent_type == "AI":
-        return {
-            "epsilon": trial.suggest_float("epsilon", 0.05, 0.5),
-            "alpha": trial.suggest_float("alpha", 1e-3, 0.3, log=True),
-            "k": trial.suggest_float("k", 0.3, 1.0),
-            "tau": trial.suggest_float("tau", 1e-3, 0.5, log=True),
-            "temp": trial.suggest_float("temp", 0.3, 3.0),
-        }
-
-    if target_agent_type == "LH":
-        return {
-            "epsilon": trial.suggest_float("epsilon", 0.05, 0.5),
-            "alpha": trial.suggest_float("alpha", 1e-3, 0.3, log=True),
-            "k": trial.suggest_float("k", 0.3, 1.0),
-            "tau": trial.suggest_float("tau", 1e-3, 0.5, log=True),
-            "temperature": trial.suggest_float("temperature", 0.3, 3.0),
-            "lam_b": trial.suggest_float("lam_b", 0.7, 0.999),
-            "lambda_ref": trial.suggest_float("lambda_ref", 0.7, 0.999),
-            "B": trial.suggest_int("B", 3, 8),
-        }
-
-    raise ValueError(f"Unsupported target agent type: {target_agent_type}")
-
-
-def score_from_results(results: dict, target_slot: int, last_frac: float) -> float:
-    key = "avg_rewards1" if target_slot == 1 else "avg_rewards2"
-    curve = np.asarray(results[key], dtype=float)
-
-    if len(curve) == 0:
-        return float("-inf")
-
-    tail_n = max(1, int(len(curve) * last_frac))
-    return float(curve[-tail_n:].mean())
-
-
-def build_agents_for_trial(
-    env,
-    payoff_matrix,
-    cfg: StudyConfig,
-    target_hparams: dict,
-):
-    pt_target = copy.deepcopy(cfg.pt_params_target or DEFAULT_PT_PARAMS)
-    pt_opp = copy.deepcopy(cfg.pt_params_opponent or DEFAULT_PT_PARAMS)
-    fixed_opp = copy.deepcopy(cfg.fixed_opponent_kwargs or {})
-
-    target_id = 0 if cfg.target_slot == 1 else 1
-    opp_id = 1 - target_id
-
-    # Build target
-    if cfg.target_agent_type == "AI":
-        target_agent = build_ai(env, target_id, target_hparams)
-
-    elif cfg.target_agent_type == "LH":
-        lambda_ref = target_hparams.pop("lambda_ref")
-        B = target_hparams.pop("B")
-        target_agent = build_lh(
-            env=env,
-            payoff_matrix=payoff_matrix,
-            pt_params=pt_target,
-            agent_id=target_id,
-            ref_setting=cfg.ref_setting,
-            lambda_ref=lambda_ref,
-            B=B,
-            kwargs=target_hparams,
-        )
-    else:
-        raise ValueError(f"Unsupported target agent type: {cfg.target_agent_type}")
-
-    # Build frozen opponent
-    if cfg.opponent_agent_type == "AI":
-        opponent_agent = build_ai(env, opp_id, fixed_opp)
-
-    elif cfg.opponent_agent_type == "LH":
-        opponent_agent = build_lh(
-            env=env,
-            payoff_matrix=payoff_matrix,
-            pt_params=pt_opp,
-            agent_id=opp_id,
-            ref_setting=cfg.ref_setting,
-            lambda_ref=cfg.lambda_ref,
-            B=cfg.B,
-            kwargs=fixed_opp,
-        )
-
-    elif cfg.opponent_agent_type == "AH":
-        opponent_agent = build_ah(
-            env=env,
-            payoff_matrix=payoff_matrix,
-            pt_params=pt_opp,
-            agent_id=opp_id,
-            opponent_type=cfg.target_agent_type,
-            opp_pt_params=pt_target if cfg.target_agent_type != "AI" else DEFAULT_PT_PARAMS,
-            ref_setting=cfg.ref_setting,
-        )
-
-    else:
-        raise ValueError(f"Unsupported opponent agent type: {cfg.opponent_agent_type}")
-
-    if cfg.target_slot == 1:
-        return target_agent, opponent_agent
-    return opponent_agent, target_agent
-
-
 def make_objective(cfg):
     games = get_all_games()
     payoff_matrix = games[cfg.game_name]
@@ -285,18 +127,6 @@ def run_study(cfg: StudyConfig, n_trials: int = 50, study_name: str | None = Non
 
     return study
 
-def is_role_symmetric(payoff_matrix, atol=1e-8):
-    """
-    Checks player-swap symmetry for 2x2x2 payoff tables:
-    u1(a1, a2) == u2(a2, a1) and u2(a1, a2) == u1(a2, a1)
-    """
-    for a1 in range(payoff_matrix.shape[0]):
-        for a2 in range(payoff_matrix.shape[1]):
-            if not np.isclose(payoff_matrix[a1, a2, 0], payoff_matrix[a2, a1, 1], atol=atol):
-                return False
-            if not np.isclose(payoff_matrix[a1, a2, 1], payoff_matrix[a2, a1, 0], atol=atol):
-                return False
-    return True
 
 def build_agent(
     agent_type,
@@ -590,25 +420,30 @@ def run_all_studies(games_dict, base_cfg, n_trials=50, storage="sqlite:///optuna
                 print(f"Skipping {study_name_2}: {e}")
 
     return all_results
-
 if __name__ == "__main__":
-    cfg = StudyConfig(
-        game_name="Prisoner's Dilemma",
-        target_slot=1,
-        target_agent_type="LH",
-        opponent_agent_type="AI",
+    base_cfg = StudyConfig(
+        game_name="PrisonersDilemma",   # placeholder, overwritten in run_all_studies
+        agent1_type="LH",               # placeholder
+        agent2_type="AI",               # placeholder
+        target_slot=1,                  # placeholder
+
         episodes=500,
         horizon=100,
         state_history=2,
+        action_size=2,
+
         ref_setting="EMA",
-        lambda_ref=0.95,
-        B=5,
+        ref_lambda=0.95,
+
         exploration_decay=0.99,
         n_seeds=3,
         last_frac=0.2,
-        pt_params_target=copy.deepcopy(DEFAULT_PT_PARAMS),
-        pt_params_opponent=copy.deepcopy(DEFAULT_PT_PARAMS),
-        fixed_opponent_kwargs={
+
+        pt_params1=copy.deepcopy(DEFAULT_PT_PARAMS),
+        pt_params2=copy.deepcopy(DEFAULT_PT_PARAMS),
+
+        fixed_agent1_kwargs={},
+        fixed_agent2_kwargs={
             "epsilon": 0.3,
             "alpha": 0.1,
             "k": 0.7,
@@ -617,12 +452,13 @@ if __name__ == "__main__":
         },
     )
 
-    study = run_study(
-        cfg=cfg,
+    games = get_all_games()
+    results = run_all_studies(
+        games_dict=games,
+        base_cfg=base_cfg,
         n_trials=50,
-        study_name="pd_lh_slot1_vs_ai_fixed",
         storage="sqlite:///optuna_repeated.db",
     )
 
-    print("Best value:", study.best_value)
-    print("Best params:", study.best_params)
+    for matchup_key, result in results.items():
+        print(matchup_key, result)

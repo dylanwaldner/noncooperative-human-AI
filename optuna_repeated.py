@@ -439,7 +439,7 @@ if __name__ == "__main__":
         ref_lambda=0.95,
 
         exploration_decay=0.99,
-        n_seeds=1,
+        n_seeds=3,
         last_frac=0.2,
 
         pt_params1=copy.deepcopy(DEFAULT_PT_PARAMS),
@@ -471,7 +471,7 @@ if __name__ == "__main__":
     results = run_all_studies(
         games_dict=games,
         base_cfg=base_cfg,
-        n_trials=1,
+        n_trials=30,
         storage="sqlite:///optuna_repeated.db",
     )
 

@@ -27,7 +27,6 @@ class LearningHumanPTAgent:
         pt_params,
         agent_id=0,
         ref_setting='Fixed',
-        lambda_ref=0.95,
         payoff_matrix=None,
         B=5,
         epsilon=0.3,
@@ -38,6 +37,7 @@ class LearningHumanPTAgent:
         tau=0.1,
         temperature=1.3,
         lam_b=0.95,
+        lambda_ref=0.95,
         ref_k=0.9,
     ):
         self.state_size = state_size * B - 1

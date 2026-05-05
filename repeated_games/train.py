@@ -12,6 +12,7 @@ import pandas as pd
 import time
 import copy
 import random
+import optuna
 BASE_SEED = 42
 
 from matplotlib.ticker import FuncFormatter
@@ -310,6 +311,12 @@ def train_agents(agent1, agent2, env, episodes=500,
 
     return results
 
+
+def load_best_params(game_name, agent1_type, agent2_type, target_slot, storage="sqlite:///optuna_repeated.db"):
+    study_name = f"{game_name}__{agent1_type}_vs_{agent2_type}__tune_agent{target_slot}"
+    study = optuna.load_study(study_name=study_name, storage=storage)
+    return study.best_params
+
 def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting='Fixed', pt_params={}, ref_point=0, state_history=2, num_experiments=30, action_size=2, env=None):
     """
     Run all agent matchups for a game
@@ -381,6 +388,20 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
         print('='*70)
 
         matchup_key = f"{agent1_type}_vs_{agent2_type}"
+
+        params1 = {}
+        params2 = {}
+
+        if agent1_type in ["LH", "AI"]:
+            params1 = load_best_params(game_name, agent1_type, agent2_type, 1)
+
+        if agent2_type in ["LH", "AI"]:
+            params2 = load_best_params(game_name, agent1_type, agent2_type, 2)
+
+        print(f"[{game_name}] {agent1_type}_vs_{agent2_type}")
+        print("  Agent1 params:", params1 if params1 else "default")
+        print("  Agent2 params:", params2 if params2 else "default")
+
         all_results[matchup_key] = dict()
         results = dict()
 
@@ -404,14 +425,14 @@ def run_complete_experiment(game_name, payoff_matrix, episodes=300, ref_setting=
 
             # Create agents based on type
             if agent1_type == 'LH':
-                agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params1, agent_id=0, ref_setting=ref_setting, lambda_ref = ref_lambda, payoff_matrix=payoff_matrix)
+                agent1 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params1, agent_id=0, ref_setting=ref_setting, payoff_matrix=payoff_matrix, **params1)
             elif agent1_type == 'AI':  # AI
-                agent1 = AIAgent(env.state_size, action_size, action_size, agent_id=0)
+                agent1 = AIAgent(env.state_size, action_size, action_size, agent_id=0, **params1)
 
             if agent2_type == 'LH':
-                agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params2, agent_id=1, ref_setting=ref_setting, lambda_ref=ref_lambda, payoff_matrix=payoff_matrix)
+                agent2 = LearningHumanPTAgent(env.state_size, action_size, action_size, pt_params2, agent_id=1, ref_setting=ref_setting, payoff_matrix=payoff_matrix, **params2)
             elif agent2_type == 'AI':  # AI
-                agent2 = AIAgent(env.state_size, action_size, action_size, agent_id=1)
+                agent2 = AIAgent(env.state_size, action_size, action_size, agent_id=1, **params2)
 
             if agent1_type == 'AH1':
                 opp_params = dict()
